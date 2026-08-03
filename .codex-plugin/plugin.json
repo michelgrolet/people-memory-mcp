@@ -1,0 +1,31 @@
+{
+  "name": "people-memory-mcp",
+  "version": "0.1.0",
+  "description": "A private people graph that gives your AI agent durable memory across conversations.",
+  "author": {
+    "name": "Michel Grolet",
+    "url": "https://github.com/michelgrolet"
+  },
+  "homepage": "https://github.com/michelgrolet/people-memory-mcp",
+  "repository": "https://github.com/michelgrolet/people-memory-mcp",
+  "license": "MIT",
+  "keywords": ["people", "memory", "mcp", "contacts", "knowledge-graph"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "People Memory",
+    "shortDescription": "Give your agent durable memory of everyone you know.",
+    "longDescription": "A private people graph with MCP tools, imports, a browser UI, and skills that retrieve and remember people across conversations.",
+    "developerName": "Michel Grolet",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://github.com/michelgrolet/people-memory-mcp",
+    "privacyPolicyURL": "https://github.com/michelgrolet/people-memory-mcp/blob/main/docs/privacy.md",
+    "defaultPrompt": [
+      "Set up People Memory for my agent.",
+      "Who do I know at this company?",
+      "Import my LinkedIn connections."
+    ],
+    "brandColor": "#F5A524"
+  },
+  "mcpServers": "./.mcp.json"
+}

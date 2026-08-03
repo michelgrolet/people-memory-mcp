@@ -1,0 +1,4 @@
+interface:
+  display_name: "Import contacts"
+  short_description: "Import LinkedIn, Google, WhatsApp, and CSV contacts"
+  default_prompt: "Help me import contacts into People Memory without creating duplicates."

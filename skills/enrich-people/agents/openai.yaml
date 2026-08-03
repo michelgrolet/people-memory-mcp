@@ -1,0 +1,4 @@
+interface:
+  display_name: "Enrich people"
+  short_description: "Learn from Gmail, Calendar, Drive, and connectors"
+  default_prompt: "Enrich my people graph from the sources I approve and ask when identities are unclear."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Maintain People Memory"
+  short_description: "Find duplicates, stale ties, and data quality issues"
+  default_prompt: "Audit my people graph, explain issues, and fix only the changes I approve."

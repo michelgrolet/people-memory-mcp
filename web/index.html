@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0A0B0D">
+<title>People Memory</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://api.fontshare.com/v2/css?f%5B%5D=satoshi@700,900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0A0B0D; --bg2:#0E1013; --surface:#141619; --surface2:#1A1D22; --surface3:#20242B;
+    --line:#23262E; --line2:#31363F;
+    --txt:#E9EBEF; --txt2:#A7ADBA; --muted:#6E7480;
+    --accent:#F5A524; --accent2:#FFC65C; --accent-dim:rgba(245,165,36,.14);
+    --org:#2DD4BF; --red:#F0645F; --ok:#4ADE80;
+    --t0:#4A4F5C; --t1:#727888; --t2:#9B8B6C; --t3:#C79C4E; --t4:#EDB13C; --t5:#FFD36E;
+    --r-sm:5px; --r-md:9px; --r-lg:14px;
+    --shadow:0 18px 50px -12px rgba(0,0,0,.7), 0 2px 8px rgba(0,0,0,.4);
+    --ease:cubic-bezier(.16,1,.3,1);
+    --font:"DM Sans","Helvetica Neue",sans-serif;
+    --display:"Satoshi","DM Sans",sans-serif;
+    --mono:"JetBrains Mono",ui-monospace,monospace;
+    --top:56px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  html,body{height:100%;overflow:hidden}
+  body{
+    background:var(--bg);color:var(--txt);
+    font:15px/1.5 var(--font);
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior:none;
+  }
+  body::after{
+    content:"";position:fixed;inset:0;z-index:9999;pointer-events:none;opacity:.032;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  ::selection{background:var(--accent-dim);color:var(--accent2)}
+  button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--line2);border-radius:9px;border:2px solid transparent;background-clip:content-box}
+  ::-webkit-scrollbar-thumb:hover{background:#414755;background-clip:content-box}
+
+  /* ── primitives ────────────────────────────────────── */
+  .btn{
+    display:inline-flex;align-items:center;gap:7px;
+    background:var(--surface2);border:1px solid var(--line);color:var(--txt2);
+    border-radius:var(--r-md);padding:7px 11px;font-size:13px;font-weight:500;
+    cursor:pointer;transition:background 150ms var(--ease),border-color 150ms var(--ease),color 150ms var(--ease);
+    white-space:nowrap;
+  }
+  .btn:hover{background:var(--surface3);border-color:var(--line2);color:var(--txt)}
+  .btn:active{transform:translateY(.5px)}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#17130A;font-weight:600}
+  .btn-primary:hover{background:var(--accent2);border-color:var(--accent2);color:#17130A}
+  .btn-ghost{background:transparent;border-color:transparent}
+  .btn-ghost:hover{background:var(--surface2);border-color:var(--line)}
+  .btn-sm{padding:4px 8px;font-size:12px;border-radius:var(--r-sm)}
+  .btn-icon{padding:7px;width:32px;height:32px;justify-content:center}
+  input[type=text],input[type=email],input[type=date],input:not([type]),select,textarea{
+    background:var(--bg2);border:1px solid var(--line);color:var(--txt);
+    border-radius:var(--r-md);padding:8px 10px;font-size:13.5px;width:100%;
+    transition:border-color 150ms var(--ease),background 150ms var(--ease);
+  }
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);background:var(--surface)}
+  input::placeholder{color:var(--muted)}
+  textarea{resize:vertical;min-height:62px;line-height:1.5}
+  label.fl{display:block;font-size:11px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+  kbd{
+    font:500 10.5px/1 var(--mono);background:var(--surface3);border:1px solid var(--line2);
+    border-bottom-width:2px;border-radius:4px;padding:3px 5px;color:var(--txt2);
+  }
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .chip{
+    display:inline-flex;align-items:center;gap:5px;font:500 11px/1 var(--mono);
+    padding:4px 8px;border-radius:999px;border:1px solid var(--line2);color:var(--txt2);
+  }
+  .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+
+  /* ── canvas ──────────────────────────────────────── */
+  #stage{position:fixed;inset:0}
+  #graph{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+  #graph.grabbing{cursor:grabbing}
+  #graph.pointing{cursor:pointer}
+  #vignette{
+    position:fixed;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse 90% 70% at 50% 45%,transparent 40%,rgba(0,0,0,.55) 100%);
+  }
+
+  /* ── top bar ─────────────────────────────────────── */
+  #top{
+    position:fixed;top:0;left:0;right:0;height:var(--top);z-index:40;
+    display:flex;align-items:center;gap:10px;padding:0 14px;
+    background:linear-gradient(to bottom,rgba(10,11,13,.92),rgba(10,11,13,.62) 70%,transparent);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  }
+  #top::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(to right,transparent,var(--line) 12%,var(--line) 88%,transparent)}
+  .brand{display:flex;align-items:baseline;gap:9px;font-family:var(--display);font-weight:900;font-size:16px;letter-spacing:-.01em}
+  .brand .mark{color:var(--accent);font-size:17px;line-height:1}
+  .brand .who{font:400 12px/1 var(--font);color:var(--muted);letter-spacing:0}
+  .stats{display:flex;gap:0;align-items:center;margin-left:6px}
+  .stat{display:flex;align-items:baseline;gap:4px;padding:0 11px;border-left:1px solid var(--line)}
+  .stat b{font:500 13px/1 var(--mono);color:var(--txt)}
+  .stat span{font-size:11.5px;color:var(--muted)}
+  .spacer{flex:1}
+  #searchTrigger{
+    display:flex;align-items:center;gap:9px;min-width:230px;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);
+    padding:7px 8px 7px 11px;color:var(--muted);font-size:13px;cursor:pointer;
+    transition:border-color 150ms var(--ease),background 150ms var(--ease);
+  }
+  #searchTrigger:hover{border-color:var(--line2);background:var(--surface2)}
+  #searchTrigger .lbl{flex:1;text-align:left}
+  .icon{width:15px;height:15px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+  /* ── filters popover ─────────────────────────────── */
+  .pop{
+    position:absolute;top:calc(var(--top) - 6px);z-index:55;width:290px;
+    background:var(--surface);border:1px solid var(--line2);border-radius:var(--r-lg);
+    box-shadow:var(--shadow);padding:14px;
+    opacity:0;transform:translateY(-6px) scale(.98);pointer-events:none;
+    transition:opacity 160ms var(--ease),transform 160ms var(--ease);
+  }
+  .pop.open{opacity:1;transform:none;pointer-events:auto}
+  .pop h4{font:600 11px/1 var(--font);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 9px}
+  .pop .grp+.grp{margin-top:15px;padding-top:15px;border-top:1px solid var(--line)}
+  .ties{display:flex;gap:5px}
+  .tie-btn{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:7px 0 6px;
+    background:var(--bg2);border:1px solid var(--line);border-radius:var(--r-sm);
+    cursor:pointer;transition:all 130ms var(--ease);font:500 10px/1 var(--mono);color:var(--muted);
+  }
+  .tie-btn .sw{width:12px;height:12px;border-radius:50%}
+  .tie-btn[aria-pressed=true]{background:var(--surface3);border-color:var(--line2);color:var(--txt)}
+  .tie-btn[aria-pressed=false]{opacity:.4}
+  .tie-btn:hover{border-color:var(--line2)}
+  .toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:var(--txt2);padding:5px 0;cursor:pointer}
+  .sw-track{width:34px;height:19px;border-radius:999px;background:var(--surface3);border:1px solid var(--line2);position:relative;transition:background 160ms var(--ease),border-color 160ms var(--ease);flex:0 0 auto}
+  .sw-track::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--muted);transition:transform 180ms var(--ease),background 160ms var(--ease)}
+  input[type=checkbox]{position:absolute;opacity:0;width:0;height:0}
+  input:checked+.sw-track{background:var(--accent-dim);border-color:var(--accent)}
+  input:checked+.sw-track::after{transform:translateX(15px);background:var(--accent)}
+  input:focus-visible+.sw-track{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* ── active filter bar ───────────────────────────── */
+  #activeFilters{
+    position:fixed;top:calc(var(--top) + 10px);left:14px;z-index:30;
+    display:flex;gap:7px;align-items:center;flex-wrap:wrap;max-width:calc(100% - 28px);
+  }
+  #activeFilters .chip{background:rgba(20,22,25,.85);backdrop-filter:blur(8px);color:var(--txt);border-color:var(--line2)}
+  #activeFilters .chip b{color:var(--accent2);font-weight:500}
+  #activeFilters .chip button{background:none;border:none;color:var(--muted);cursor:pointer;padding:0 0 0 2px;line-height:1}
+  #activeFilters .chip button:hover{color:var(--red)}
+
+  /* ── legend + zoom ───────────────────────────────── */
+  #legend{
+    position:fixed;left:14px;bottom:14px;z-index:30;
+    background:rgba(16,18,21,.78);backdrop-filter:blur(10px);
+    border:1px solid var(--line);border-radius:var(--r-md);padding:11px 13px;
+    font-size:11.5px;color:var(--muted);line-height:1.9;pointer-events:none;
+  }
+  #legend .row{display:flex;align-items:center;gap:8px}
+  #legend .ramp{display:flex;gap:2px;margin:0 2px}
+  #legend .ramp i{width:10px;height:10px;border-radius:50%}
+  #legend .dia{width:9px;height:9px;transform:rotate(45deg)}
+  #zoomctl{position:fixed;right:14px;bottom:14px;z-index:30;display:flex;flex-direction:column;gap:6px;transition:transform 320ms var(--ease)}
+  #zoomctl .btn{background:rgba(20,22,25,.85);backdrop-filter:blur(10px)}
+  body.drawer-open #zoomctl{transform:translateX(-396px)}
+  @media (max-width:860px){body.drawer-open #zoomctl{transform:none;opacity:0;pointer-events:none}}
+
+  /* ── command palette ────────────────────────────── */
+  #scrim{
+    position:fixed;inset:0;z-index:60;background:rgba(6,7,9,.62);
+    backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity 180ms var(--ease);
+  }
+  #scrim.open{opacity:1;pointer-events:auto}
+  #palette{
+    position:fixed;z-index:61;top:12vh;left:50%;width:min(660px,calc(100% - 28px));
+    transform:translate(-50%,-10px) scale(.985);opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line2);border-radius:var(--r-lg);
+    box-shadow:var(--shadow);overflow:hidden;
+    transition:opacity 180ms var(--ease),transform 220ms var(--ease);
+  }
+  #palette.open{opacity:1;transform:translate(-50%,0) scale(1);pointer-events:auto}
+  .pal-input{display:flex;align-items:center;gap:11px;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .pal-input input{background:none;border:none;padding:0;font-size:16px;font-weight:500}
+  .pal-input input:focus{background:none}
+  .pal-input .icon{width:17px;height:17px;color:var(--muted)}
+  .pal-list{max-height:min(56vh,470px);overflow-y:auto;padding:6px}
+  .pal-sec{font:600 10.5px/1 var(--font);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding:11px 10px 7px;display:flex;justify-content:space-between}
+  .pal-row{
+    display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:var(--r-md);
+    cursor:pointer;scroll-margin:10px;
+  }
+  .pal-row[aria-selected=true]{background:var(--surface3)}
+  .pal-row[aria-selected=true] .pal-go{opacity:1}
+  .mono-avatar{
+    width:30px;height:30px;border-radius:9px;flex:0 0 auto;display:grid;place-items:center;
+    font:600 11.5px/1 var(--mono);letter-spacing:-.02em;
+    background:var(--surface3);border:1px solid var(--line2);
+  }
+  .pal-main{flex:1;min-width:0}
+  .pal-name{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pal-name mark{background:none;color:var(--accent2);font-weight:700}
+  .pal-meta{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  .pal-right{display:flex;align-items:center;gap:9px;flex:0 0 auto}
+  .pal-ago{font:400 11px/1 var(--mono);color:var(--muted)}
+  .pal-go{opacity:0;color:var(--muted)}
+  .pal-empty{padding:34px 16px;text-align:center;color:var(--muted);font-size:13.5px}
+  .pal-foot{
+    display:flex;gap:16px;align-items:center;padding:9px 16px;border-top:1px solid var(--line);
+    font-size:11.5px;color:var(--muted);background:var(--bg2);
+  }
+  .pal-foot span{display:flex;align-items:center;gap:6px}
+
+  /* ── drawer ────────────────────────────────────── */
+  #drawer{
+    position:fixed;top:var(--top);right:0;bottom:0;width:390px;max-width:100%;z-index:50;
+    background:var(--surface);border-left:1px solid var(--line);
+    box-shadow:-24px 0 60px -20px rgba(0,0,0,.6);
+    transform:translateX(102%);transition:transform 320ms var(--ease);
+    display:flex;flex-direction:column;
+  }
+  #drawer.open{transform:none}
+  .dr-head{
+    display:flex;align-items:flex-start;gap:12px;padding:16px 16px 14px;
+    border-bottom:1px solid var(--line);flex:0 0 auto;
+  }
+  .dr-head .mono-avatar{width:42px;height:42px;border-radius:12px;font-size:15px}
+  .dr-id{flex:1;min-width:0}
+  .dr-id h2{font:700 19px/1.2 var(--display);letter-spacing:-.015em;word-break:break-word}
+  .dr-id .sub{display:flex;align-items:center;gap:7px;margin-top:6px;flex-wrap:wrap}
+  .dr-body{flex:1;overflow-y:auto;padding:16px;overscroll-behavior:contain}
+  .dr-body>*+*{margin-top:18px}
+  section.blk h3{
+    font:600 10.5px/1 var(--font);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+    margin-bottom:9px;display:flex;justify-content:space-between;align-items:center;
+  }
+  section.blk h3 em{font-style:normal;font-family:var(--mono);font-size:10.5px}
+  .row-item{
+    display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--r-sm);
+    font-size:13px;background:var(--bg2);border:1px solid var(--line);
+  }
+  .row-item+.row-item{margin-top:5px}
+  .row-item .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row-item .lbl .k{color:var(--muted);font-size:11.5px;font-family:var(--mono)}
+  .row-item a.lbl{color:var(--txt);text-decoration:none;cursor:pointer}
+  .row-item a.lbl:hover{color:var(--accent2)}
+  .row-item .x{color:var(--muted);cursor:pointer;padding:0 2px;line-height:1;opacity:0;transition:opacity 130ms,color 130ms}
+  .row-item:hover .x{opacity:1}
+  .row-item .x:hover{color:var(--red)}
+  .none{font-size:12.5px;color:var(--muted);font-style:italic}
+  .add{display:flex;gap:5px;margin-top:7px}
+  .add input,.add select{padding:6px 8px;font-size:12.5px;min-width:0}
+  .add .btn{flex:0 0 auto}
+  .ia{display:flex;gap:10px;padding:8px 0;font-size:13px;border-bottom:1px solid var(--line)}
+  .ia:last-child{border-bottom:none}
+  .ia time{font:400 11px/1.5 var(--mono);color:var(--muted);flex:0 0 62px}
+  .ia .txt{flex:1;color:var(--txt2);line-height:1.5}
+  .ia .ch{color:var(--accent2);font-size:11px;font-family:var(--mono)}
+  .ia .x{color:var(--muted);cursor:pointer;padding:0 2px;line-height:1;flex:0 0 auto;transition:color 130ms}
+  .ia .x:hover{color:var(--red)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .fld+.fld,.fld+.grid2,.grid2+.fld,.grid2+.grid2{margin-top:12px}
+  label.fl .fl-hint{font-style:normal;text-transform:none;letter-spacing:0;opacity:.75}
+  .tie-ticks{display:flex;justify-content:space-between;margin-top:5px;font:500 10px/1 var(--mono);color:var(--muted)}
+  .tie-ticks .on{color:var(--txt)}
+  label.fl .fl-link{float:right;color:var(--accent2);text-decoration:none;text-transform:none;letter-spacing:0}
+  label.fl .fl-link:hover{text-decoration:underline}
+  section.blk h3 em.hint{font-family:var(--font);text-transform:none;letter-spacing:0;font-weight:400;opacity:.7}
+  section.blk h3 em.hint.err{color:var(--red);opacity:1}
+  .dr-foot{flex:0 0 auto;padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;
+           align-items:center;justify-content:flex-end;background:var(--bg2)}
+  .msg-err{color:var(--red);font-size:12.5px;margin-top:9px}
+  .btn-danger{border-color:var(--red);color:var(--red)}
+  .btn-danger:hover{background:var(--red);border-color:var(--red);color:#17130A}
+  .dr-foot .del-confirm{flex:1;display:flex;flex-direction:column;gap:10px}
+  .del-confirm p{font-size:13px;line-height:1.5;color:var(--txt2)}
+  .del-confirm .muted{display:block;color:var(--muted);font-size:12px;margin-top:3px}
+  .del-confirm .del-actions{display:flex;gap:8px}
+  .del-confirm .del-actions .btn{flex:1;justify-content:center}
+
+  /* ── login ─────────────────────────────────────── */
+  #login{
+    position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:20px;
+    background:radial-gradient(ellipse 70% 55% at 50% 40%,#14161C,var(--bg) 70%);
+  }
+  #login .box{width:min(400px,100%);text-align:left}
+  #login .mark{font-family:var(--display);font-weight:900;font-size:34px;color:var(--accent);line-height:1}
+  #login h1{font:700 26px/1.2 var(--display);letter-spacing:-.02em;margin:18px 0 8px}
+  #login p{color:var(--muted);font-size:13.5px;margin-bottom:26px;line-height:1.6}
+  #login .btn{width:100%;justify-content:center;padding:11px}
+  #login .sep{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:11px;margin:18px 0;letter-spacing:.08em;text-transform:uppercase}
+  #login .sep::before,#login .sep::after{content:"";flex:1;height:1px;background:var(--line)}
+  #login input{margin-bottom:9px;padding:11px}
+  #loginMsg{font-size:12.5px;margin-top:12px}
+
+  /* ── boot / toast ────────────────────────────────── */
+  #boot{position:fixed;inset:0;z-index:70;display:grid;place-items:center;background:var(--bg);transition:opacity 320ms var(--ease)}
+  #boot.gone{opacity:0;pointer-events:none}
+  .pulse{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px}
+  .pulse .dot{background:var(--accent);animation:pl 1.4s ease-in-out infinite}
+  @keyframes pl{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
+  #toasts{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:80;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+  .toast{
+    background:var(--surface2);border:1px solid var(--line2);border-radius:var(--r-md);
+    padding:9px 14px;font-size:13px;box-shadow:var(--shadow);display:flex;align-items:center;gap:9px;
+    animation:tin 240ms var(--ease);max-width:min(460px,92vw);
+  }
+  .toast.err{border-color:var(--red);color:#FFD3D1}
+  @keyframes tin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  #tooltip{
+    position:fixed;z-index:35;pointer-events:none;opacity:0;
+    background:rgba(20,22,25,.94);border:1px solid var(--line2);border-radius:var(--r-sm);
+    padding:6px 9px;font-size:12.5px;white-space:nowrap;box-shadow:var(--shadow);
+    transition:opacity 120ms var(--ease);
+  }
+  #tooltip.on{opacity:1}
+  #tooltip .m{color:var(--muted);font-size:11px;margin-left:6px}
+
+  @media (max-width:900px){
+    .stats .stat:nth-child(n+3){display:none}
+    #searchTrigger{min-width:0}#searchTrigger .lbl{display:none}
+    .brand .who{display:none}
+  }
+  @media (max-width:640px){
+    .stats{display:none}
+    #drawer{width:100%}
+    #palette{top:0;left:0;transform:none;width:100%;border-radius:0;height:100%;display:flex;flex-direction:column}
+    #palette.open{transform:none}
+    .pal-list{max-height:none;flex:1}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation-duration:.01ms!important;transition-duration:.01ms!important}
+  }
+</style>
+</head>
+<body>
+
+<div id="boot"><div class="pulse"><span class="dot"></span> loading your people graph…</div></div>
+
+<div id="login" hidden>
+  <div class="box">
+    <div class="mark">⊙</div>
+    <h1>People Memory</h1>
+    <p>Your private map of everyone you know, what matters about them, and how they connect.</p>
+    <button class="btn btn-primary" id="googleBtn">
+      <svg class="icon" viewBox="0 0 24 24" style="stroke:none;fill:currentColor"><path d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.4z"/><path d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22z"/><path d="M6.4 14c-.2-.6-.3-1.3-.3-2s.1-1.4.3-2V7.4H3.1a10 10 0 0 0 0 9.2L6.4 14z"/><path d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.8-2.8A10 10 0 0 0 3.1 7.4L6.4 10c.8-2.3 3-4.1 5.6-4.1z"/></svg>
+      Continue with Google
+    </button>
+    <div class="sep">or</div>
+    <input type="email" id="emailInput" placeholder="you@example.com" autocomplete="email">
+    <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password">
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" id="emailBtn">Sign in</button>
+      <button class="btn" id="signupBtn">Create account</button>
+    </div>
+    <div id="loginMsg"></div>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <div id="stage">
+    <canvas id="graph"></canvas>
+    <div id="vignette"></div>
+  </div>
+
+  <header id="top">
+    <div class="brand"><span class="mark">⊙</span> People Memory <span class="who" id="whoami"></span></div>
+    <div class="stats" id="stats"></div>
+    <div class="spacer"></div>
+    <button id="searchTrigger" title="Directory (⌘K)">
+      <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <span class="lbl">Directory, search…</span>
+      <kbd id="kbdHint">⌘K</kbd>
+    </button>
+    <button class="btn" id="filterBtn">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
+      Filters
+    </button>
+    <button class="btn btn-primary" id="newBtn" title="New person (⌘⇧N)">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+      Person
+    </button>
+    <button class="btn btn-ghost btn-icon" id="logoutBtn" title="Sign out">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+    </button>
+  </header>
+
+  <div class="pop" id="filterPop">
+    <div class="grp">
+      <h4>Relationship strength</h4>
+      <div class="ties" id="ties"></div>
+    </div>
+    <div class="grp">
+      <h4>Organization</h4>
+      <select id="orgFilter"></select>
+    </div>
+    <div class="grp">
+      <label class="toggle">Show unconnected people
+        <input type="checkbox" id="showIsolated"><span class="sw-track"></span>
+      </label>
+      <label class="toggle">Show organizations
+        <input type="checkbox" id="showOrgs" checked><span class="sw-track"></span>
+      </label>
+      <label class="toggle">Show names on graph
+        <input type="checkbox" id="showLabels" checked><span class="sw-track"></span>
+      </label>
+    </div>
+    <div class="grp"><button class="btn" id="resetBtn" style="width:100%;justify-content:center">Reset all</button></div>
+  </div>
+
+  <div id="activeFilters"></div>
+
+  <div id="legend">
+    <div class="row">contact
+      <span class="ramp">
+        <i style="background:var(--t0)"></i><i style="background:var(--t1)"></i><i style="background:var(--t2)"></i>
+        <i style="background:var(--t3)"></i><i style="background:var(--t4)"></i><i style="background:var(--t5)"></i>
+      </span>
+      inner circle
+    </div>
+    <div class="row"><span class="dia" style="background:var(--org)"></span> organization</div>
+    <div class="row" style="opacity:.65">unconnected people stay in the directory <kbd>⌘K</kbd></div>
+  </div>
+
+  <div id="zoomctl">
+    <button class="btn btn-icon" id="zoomIn" title="Zoom in">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button class="btn btn-icon" id="zoomOut" title="Zoom out">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+    <button class="btn btn-icon" id="fitBtn" title="Fit all (F)">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  </div>
+
+  <aside id="drawer" aria-label="Person record"></aside>
+</div>
+
+<div id="scrim"></div>
+<div id="palette">
+  <div class="pal-input">
+    <svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="palQ" placeholder="Search a name, city, or organization…" autocomplete="off" spellcheck="false">
+    <kbd>esc</kbd>
+  </div>
+  <div class="pal-list" id="palList"></div>
+  <div class="pal-foot">
+    <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+    <span><kbd>↵</kbd> open record</span>
+    <span id="palCount"></span>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+<div id="toasts"></div>
+<datalist id="orgs-dl"></datalist>
+<datalist id="people-dl"></datalist>
+
+<script src="./config.js"></script>
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const CONFIG = window.PEOPLE_MEMORY_CONFIG || {};
+const SUPABASE_URL = CONFIG.supabaseUrl;
+const SUPABASE_KEY = CONFIG.supabaseKey;
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  document.getElementById("boot").innerHTML = `<div class="pulse" style="color:var(--red)">
+    Missing web/config.js. Copy config.example.js and add your Supabase URL and publishable key.
+  </div>`;
+  throw new Error("Missing People Memory web configuration");
+}
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const $ = id => document.getElementById(id);
+const EDGE_KINDS = ["friend","family","partner","colleague","classmate","knows","sibling","neighbour","mentor_of","manager_of","introduced"];
+const CHANNELS = ["irl","call","whatsapp","email","linkedin","sms","visio"];
+const TIE_LABEL = {1:"contact",2:"acquaintance",3:"friend",4:"close",5:"inner circle"};
+const TIE_COLOR = ["#4A4F5C","#727888","#9B8B6C","#C79C4E","#EDB13C","#FFD36E"];
+const ALL_TIES = ["0", "1", "2", "3", "4", "5"];
+const ORG_COLOR = "#2DD4BF";
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm = s => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const tieColor = t => TIE_COLOR[t || 0];
+const tieLabel = t => t ? TIE_LABEL[t] : "not rated";
+const initials = n => n.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+function ago(days) {
+  if (days == null) return "";
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 31) return days + "d";
+  if (days < 365) return Math.round(days / 30.4) + "m";
+  const y = days / 365;
+  return (y < 10 ? y.toFixed(1) : Math.round(y)) + "a";
+}
+
+// ── toasts ─────────────────────────────────────────────────
+function toast(msg, kind) {
+  const el = document.createElement("div");
+  el.className = "toast" + (kind === "err" ? " err" : "");
+  el.innerHTML = `<span class="dot" style="background:${kind === "err" ? "var(--red)" : "var(--ok)"}"></span>${esc(msg)}`;
+  $("toasts").appendChild(el);
+  setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity 250ms"; setTimeout(() => el.remove(), 300); }, kind === "err" ? 5200 : 2400);
+}
+
+// ── auth ──────────────────────────────────────────────────
+$("googleBtn").onclick = async () => {
+  const { error } = await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: location.origin } });
+  if (error) $("loginMsg").innerHTML = `<span style="color:var(--red)">${esc(error.message)}</span>`;
+};
+$("emailBtn").onclick = async () => {
+  const email = $("emailInput").value.trim();
+  const password = $("passwordInput").value;
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) $("loginMsg").innerHTML = `<span style="color:var(--red)">${esc(error.message)}</span>`;
+};
+$("signupBtn").onclick = async () => {
+  const email = $("emailInput").value.trim();
+  const password = $("passwordInput").value;
+  const { error } = await sb.auth.signUp({ email, password });
+  if (error) $("loginMsg").innerHTML = `<span style="color:var(--red)">${esc(error.message)}</span>`;
+  else $("loginMsg").textContent = "Account created. Check your email if confirmations are enabled.";
+};
+if (CONFIG.googleOAuth === false) $("googleBtn").hidden = true;
+if (CONFIG.allowSignup === false) $("signupBtn").hidden = true;
+$("logoutBtn").onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+let started = false;
+sb.auth.onAuthStateChange((_e, s) => { if (s) start(s); });
+(async () => {
+  const { data } = await sb.auth.getSession();
+  if (data.session) start(data.session);
+  else { $("boot").classList.add("gone"); $("login").hidden = false; }
+})();
+
+async function start(session) {
+  if (started) return;
+  started = true;
+  $("login").hidden = true;
+  $("app").hidden = false;
+  $("whoami").textContent = session.user.email;
+  $("kbdHint").textContent = IS_MAC ? "⌘K" : "Ctrl K";
+  try {
+    await load();
+  } catch (e) {
+    $("boot").innerHTML = `<div class="pulse" style="color:var(--red)">${esc(e.message)}</div>`;
+    return;
+  }
+  buildGraph();
+  setupCanvas();
+  wire();
+  renderStats(); renderFilters(); renderActiveFilters();
+  prewarm();
+  requestAnimationFrame(tick);
+  fitView(false);
+  $("boot").classList.add("gone");
+  setTimeout(() => $("boot").remove(), 400);
+}
+
+// ── data ──────────────────────────────────────────────────
+let DATA = { people: [], orgs: [], edges: [], affs: [], stats: {} };
+let byId = new Map();
+
+const PAGE_SIZE = 1000; // PostgREST defaults to 1,000 rows per request (db-max-rows).
+async function fetchAll(build) {
+  let rows = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const { data, error } = await build().range(offset, offset + PAGE_SIZE - 1);
+    if (error) return { data: rows, error };
+    rows = rows.concat(data);
+    if (data.length < PAGE_SIZE) break;
+  }
+  return { data: rows, error: null };
+}
+
+async function load() {
+  const [people, orgs, edges, affs, idents, facts, inter] = await Promise.all([
+    fetchAll(() => sb.from("person").select("*").order("full_name")),
+    fetchAll(() => sb.from("orgs").select("id,name").order("name")),
+    fetchAll(() => sb.from("edges").select("a_id,b_id,kind,strength").order("a_id")),
+    fetchAll(() => sb.from("affiliations").select("person_id,org_id,role,since,until").order("person_id")),
+    fetchAll(() => sb.from("identifiers").select("person_id,kind,value").order("person_id")),
+    fetchAll(() => sb.from("facts").select("id,person_id,key,value,num,date").order("id")),
+    fetchAll(() => sb.from("interactions").select("id,person_id,happened_on,channel,summary").order("happened_on", { ascending: false })),
+  ]);
+  for (const r of [people, orgs, edges, affs, idents, facts, inter]) if (r.error) throw new Error(r.error.message);
+
+  const orgName = new Map(orgs.data.map(o => [o.id, o.name]));
+  const push = (m, k, v) => { if (!m.has(k)) m.set(k, []); m.get(k).push(v); };
+  const identsBy = new Map(), factsBy = new Map(), affsBy = new Map(), interBy = new Map();
+  idents.data.forEach(i => push(identsBy, i.person_id, i));
+  facts.data.forEach(f => push(factsBy, f.person_id, f));
+  inter.data.forEach(i => push(interBy, i.person_id, i));
+  affs.data.forEach(a => { a.org_name = orgName.get(a.org_id); push(affsBy, a.person_id, a); });
+
+  DATA.people = people.data.map(p => ({
+    id: p.id, name: p.full_name, org: p.current_org, role: p.current_role, city: p.city,
+    country: p.country, tie: p.tie_strength, age: p.age, birthdate: p.birthdate,
+    birthdayMd: p.birthday_md, metWhere: p.met_where, metWhen: p.met_when,
+    linkedinUrl: p.linkedin_url, summary: p.summary,
+    lastContact: p.last_contact, days: p.days_since_contact,
+    identifiers: identsBy.get(p.id) || [], facts: factsBy.get(p.id) || [],
+    affiliations: affsBy.get(p.id) || [], interactions: interBy.get(p.id) || [],
+    _hay: norm([p.full_name, p.current_org, p.city, p.current_role, p.country, p.summary].filter(Boolean).join(" ")),
+    _nname: norm(p.full_name),
+  }));
+  DATA.orgs = orgs.data;
+  DATA.edges = edges.data.map(e => ({ a: e.a_id, b: e.b_id, kind: e.kind, strength: e.strength }));
+  DATA.affs = affs.data;
+  byId = new Map(DATA.people.map(p => [p.id, p]));
+  DATA.stats = {
+    people: DATA.people.length, orgs: orgs.data.length, edges: DATA.edges.length,
+    affiliations: affs.data.length, identifiers: idents.data.length,
+    close: DATA.people.filter(p => p.tie >= 3).length,
+  };
+}
+
+async function reload(keepId) {
+  await load();
+  buildGraph(); renderStats(); renderFilters(); renderActiveFilters();
+  reheat(.28);
+  if (keepId != null && byId.has(keepId)) select(keepId, false); else closeDrawer();
+}
+
+function renderStats() {
+  const s = DATA.stats;
+  $("stats").innerHTML = [
+    [s.people, "people"], [s.edges, "links"], [s.orgs, "orgs"], [s.close, "close"],
+  ].map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join("");
+}
+
+// ── graph model ───────────────────────────────────────────
+let nodes = [], links = [], idx = new Map(), degree = [];
+let showIsolated = false, showOrgs = true, showLabels = true;
+let orgFilter = "", tieFilter = new Set(ALL_TIES);
+let selected = null;
+// people with no link at all are not on the graph by default; opening one from the
+// The directory pins a selection so it can appear alone without showing every isolated person.
+const pinned = new Set();
+
+function buildGraph() {
+  const prev = new Map(nodes.map(n => [n.key, n]));
+  nodes = []; links = []; idx = new Map();
+  const add = (key, o) => {
+    if (idx.has(key)) return idx.get(key);
+    const p = prev.get(key), i = nodes.length;
+    idx.set(key, i);
+    // phyllotaxis seed: compact and deterministic, so the sim never starts from an explosion
+    const a = i * 2.399963229728653, rad = 15 * Math.sqrt(i + .5);
+    nodes.push(Object.assign({
+      key, x: p ? p.x : rad * Math.cos(a), y: p ? p.y : rad * Math.sin(a),
+      vx: 0, vy: 0, r: 5,
+    }, o));
+    return i;
+  };
+  const addP = id => { const p = byId.get(id); return p ? add("p" + id, { type: "person", id, label: p.name, ref: p }) : -1; };
+  const addO = id => {
+    const o = DATA.orgs.find(x => x.id === id);
+    return o ? add("o" + id, { type: "org", id, label: o.name, ref: o }) : -1;
+  };
+
+  if (showIsolated) DATA.people.forEach(p => addP(p.id));
+  else pinned.forEach(id => addP(id));
+  if (showOrgs) {
+    // an org with a single affiliate draws a node that reveals nothing a shared
+    // connection would — that fact already lives on the person's own card — so
+    // skip it rather than papering the graph in one-off "org of one" diamonds
+    const orgPeople = new Map();
+    DATA.affs.forEach(a => { if (!orgPeople.has(a.org_id)) orgPeople.set(a.org_id, new Set()); orgPeople.get(a.org_id).add(a.person_id); });
+    DATA.affs.forEach(a => {
+      if (orgPeople.get(a.org_id).size < 2) return;
+      const x = addP(a.person_id), y = addO(a.org_id);
+      if (x >= 0 && y >= 0) links.push({ s: x, t: y, kind: "org" });
+    });
+  }
+  DATA.edges.forEach(e => { const x = addP(e.a), y = addP(e.b); if (x >= 0 && y >= 0) links.push({ s: x, t: y, kind: e.kind, ea: e.a, eb: e.b }); });
+
+  degree = new Array(nodes.length).fill(0);
+  links.forEach(l => { degree[l.s]++; degree[l.t]++; });
+  nodes.forEach((n, i) => {
+    const base = n.type === "org" ? 7 : (n.ref.tie ? 4.5 + n.ref.tie * .7 : 3.4);
+    n.deg = degree[i];
+    n.r = base + Math.min(Math.sqrt(degree[i]) * 1.7, 11);
+  });
+  // neighbour index
+  neigh = nodes.map(() => []);
+  links.forEach((l, i) => { neigh[l.s].push([l.t, i]); neigh[l.t].push([l.s, i]); });
+}
+let neigh = [];
+
+// ── force simulation (Barnes-Hut) ───────────────────────────────
+let alpha = 1, alphaTarget = 0;
+const ALPHA_MIN = .0015, ALPHA_DECAY = 1 - Math.pow(ALPHA_MIN, 1 / 320), VEL_DECAY = .58;
+const CHARGE = -420, THETA2 = .81, LINK_DIST = 62, ORG_DIST = 54, CENTER = .0022, MAX_V = 70;
+const reheat = a => { alpha = Math.max(alpha, a ?? .3); };
+
+function qtNode(x0, y0, x1, y1) { return { x0, y0, x1, y1, m: 0, cx: 0, cy: 0, bodies: [], kids: null }; }
+function qtInsert(q, p, d) {
+  if (q.kids) { qtPlace(q, p, d); return; }
+  q.bodies.push(p);
+  if (q.bodies.length > 1 && d < 22) {
+    const mx = (q.x0 + q.x1) / 2, my = (q.y0 + q.y1) / 2;
+    q.kids = [qtNode(q.x0, q.y0, mx, my), qtNode(mx, q.y0, q.x1, my), qtNode(q.x0, my, mx, q.y1), qtNode(mx, my, q.x1, q.y1)];
+    const bs = q.bodies; q.bodies = [];
+    for (const b of bs) qtPlace(q, b, d);
+  }
+}
+function qtPlace(q, p, d) {
+  const mx = (q.x0 + q.x1) / 2, my = (q.y0 + q.y1) / 2;
+  qtInsert(q.kids[(p.x >= mx ? 1 : 0) + (p.y >= my ? 2 : 0)], p, d + 1);
+}
+function qtMass(q) {
+  let m = 0, cx = 0, cy = 0;
+  if (q.kids) for (const k of q.kids) { qtMass(k); if (k.m) { m += k.m; cx += k.cx * k.m; cy += k.cy * k.m; } }
+  else for (const b of q.bodies) { m += b.q; cx += b.x * b.q; cy += b.y * b.q; }
+  q.m = m; if (m) { q.cx = cx / m; q.cy = cy / m; }
+}
+function qtForce(q, p, k) {
+  if (!q.m) return;
+  let dx = q.cx - p.x, dy = q.cy - p.y, d2 = dx * dx + dy * dy;
+  const w = q.x1 - q.x0;
+  if (!q.kids || w * w < THETA2 * d2) {
+    if (!q.kids && q.bodies.length === 1 && q.bodies[0] === p) return;
+    if (d2 < 25) { d2 = 25; dx = (p.jx || .7); dy = (p.jy || -.4); }
+    const f = k * q.m / d2, d = Math.sqrt(d2);
+    p.vx += dx / d * f; p.vy += dy / d * f;
+  } else for (const c of q.kids) qtForce(c, p, k);
+}
+
+function simStep() {
+  alpha += (alphaTarget - alpha) * ALPHA_DECAY;
+  if (!nodes.length) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const n of nodes) {
+    if (n.jx === undefined) { n.jx = Math.random() - .5; n.jy = Math.random() - .5; }
+    n.q = 1 + n.r / 9;
+    if (n.x < x0) x0 = n.x; if (n.x > x1) x1 = n.x;
+    if (n.y < y0) y0 = n.y; if (n.y > y1) y1 = n.y;
+  }
+  const w = Math.max(x1 - x0, y1 - y0, 1) * 1.02;
+  const root = qtNode(x0 - 1, y0 - 1, x0 - 1 + w, y0 - 1 + w);
+  for (const n of nodes) qtInsert(root, n, 0);
+  qtMass(root);
+
+  const k = CHARGE * alpha;
+  for (const n of nodes) if (!n.fixed) qtForce(root, n, k);
+
+  // springs, d3-style: the correction is relative to the current distance, so a
+  // link that starts far apart cannot inject a huge velocity in one step
+  for (const l of links) {
+    const a = nodes[l.s], b = nodes[l.t];
+    // hubs push their leaves further out, otherwise a 60-degree node becomes a smear
+    const target = (l.kind === "org" ? ORG_DIST : LINK_DIST) + Math.min(150, (a.deg + b.deg) * .8) + a.r + b.r;
+    let dx = (b.x + b.vx) - (a.x + a.vx), dy = (b.y + b.vy) - (a.y + a.vy);
+    let d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 1e-6) { dx = .5; dy = .5; d = .7071; }
+    const st = 1 / (1 + Math.min(a.deg, b.deg));
+    const f = (d - target) / d * alpha * st;
+    const bias = a.deg / (a.deg + b.deg);
+    if (!b.fixed) { b.vx -= dx * f * bias; b.vy -= dy * f * bias; }
+    if (!a.fixed) { a.vx += dx * f * (1 - bias); a.vy += dy * f * (1 - bias); }
+  }
+
+  for (const n of nodes) {
+    if (n.fixed) { n.vx = n.vy = 0; continue; }
+    const pull = CENTER * alpha * (n.deg ? 1 : 2.6);
+    n.vx -= n.x * pull;
+    n.vy -= n.y * pull;
+    n.vx *= VEL_DECAY; n.vy *= VEL_DECAY;
+    const sp = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
+    if (sp > MAX_V) { n.vx = n.vx / sp * MAX_V; n.vy = n.vy / sp * MAX_V; }
+    n.x += n.vx; n.y += n.vy;
+    if (!isFinite(n.x) || !isFinite(n.y)) { n.x = n.jx * 40; n.y = n.jy * 40; n.vx = n.vy = 0; }
+  }
+}
+
+// settle the layout before the first paint, so the graph appears already formed
+function prewarm(budgetMs = 900, maxSteps = 420) {
+  const t0 = performance.now();
+  let i = 0;
+  while (i < maxSteps && alpha > .05 && performance.now() - t0 < budgetMs) { simStep(); i++; }
+}
+
+// ── camera ──────────────────────────────────────────────
+let cv, ctx, W = 0, H = 0, DPR = 1;
+const cam = { x: 0, y: 0, k: 1 };
+let camAnim = null;
+
+function setupCanvas() {
+  cv = $("graph"); ctx = cv.getContext("2d", { alpha: false });
+  resize(); addEventListener("resize", resize);
+  document.fonts && document.fonts.ready.then(draw);
+}
+function resize() {
+  DPR = Math.min(2.5, devicePixelRatio || 1);
+  W = innerWidth; H = innerHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  cv.style.width = W + "px"; cv.style.height = H + "px";
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  invalidate();
+}
+const toScreen = (x, y) => ({ x: (x - cam.x) * cam.k + W / 2, y: (y - cam.y) * cam.k + H / 2 });
+const toWorld = (sx, sy) => ({ x: (sx - W / 2) / cam.k + cam.x, y: (sy - H / 2) / cam.k + cam.y });
+
+function animateCam(tx, ty, tk, ms) {
+  if (REDUCED || ms === 0) { cam.x = tx; cam.y = ty; cam.k = tk; camAnim = null; return; }
+  camAnim = { fx: cam.x, fy: cam.y, fk: cam.k, tx, ty, tk, t0: performance.now(), ms: ms || 480 };
+}
+function stepCam(now) {
+  if (!camAnim) return;
+  const p = Math.min(1, (now - camAnim.t0) / camAnim.ms), e = 1 - Math.pow(1 - p, 3);
+  cam.x = camAnim.fx + (camAnim.tx - camAnim.fx) * e;
+  cam.y = camAnim.fy + (camAnim.ty - camAnim.fy) * e;
+  cam.k = camAnim.fk + (camAnim.tk - camAnim.fk) * e;
+  if (p >= 1) camAnim = null;
+}
+function bounds(list) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const n of list) { if (n.x < x0) x0 = n.x; if (n.x > x1) x1 = n.x; if (n.y < y0) y0 = n.y; if (n.y > y1) y1 = n.y; }
+  return { x0, y0, x1, y1 };
+}
+function fitTo(list, pad, animate) {
+  if (!list.length) return;
+  const b = bounds(list);
+  const rightPad = $("drawer").classList.contains("open") && W > 860 ? 390 : 0;
+  const availW = W - rightPad - pad * 2, availH = H - 90 - pad * 2;
+  const k = Math.min(2.1, Math.max(.1, Math.min(availW / Math.max(b.x1 - b.x0, 60), availH / Math.max(b.y1 - b.y0, 60))));
+  const cx = (b.x0 + b.x1) / 2 + (rightPad / 2) / k;
+  animateCam(cx, (b.y0 + b.y1) / 2 - 28 / k, k, animate === false ? 0 : 520);
+}
+const fitView = a => fitTo(nodes, 70, a);
+
+// ── filtering / dimming ────────────────────────────────────
+function passes(p) {
+  if (orgFilter && p.org !== orgFilter) return false;
+  if (!tieFilter.has(String(p.tie || 0))) return false;
+  return true;
+}
+let dim = [], egoSet = null;
+function computeDim() {
+  dim = new Array(nodes.length).fill(false);
+  const anyFilter = orgFilter || tieFilter.size < ALL_TIES.length;
+  nodes.forEach((n, i) => { if (n.type === "person") dim[i] = anyFilter && !passes(n.ref); });
+  nodes.forEach((n, i) => {
+    if (n.type !== "org") return;
+    if (!anyFilter) return;
+    if (orgFilter && n.label === orgFilter) return;
+    dim[i] = !neigh[i].some(([j]) => !dim[j]);
+  });
+  if (egoSet) nodes.forEach((n, i) => { if (!egoSet.has(i)) dim[i] = true; });
+}
+
+// ── drawing ─────────────────────────────────────────────
+let hoverIdx = -1;
+function draw() {
+  ctx.fillStyle = "#0A0B0D";
+  ctx.fillRect(0, 0, W, H);
+  computeDim();
+
+  const selIdx = selected != null ? idx.get("p" + selected) : undefined;
+  const focus = hoverIdx >= 0 ? hoverIdx : (selIdx !== undefined ? selIdx : -1);
+  const near = new Set();
+  if (focus >= 0) { near.add(focus); neigh[focus].forEach(([j]) => near.add(j)); }
+
+  ctx.save();
+  ctx.translate(W / 2, H / 2); ctx.scale(cam.k, cam.k); ctx.translate(-cam.x, -cam.y);
+
+  // links
+  ctx.lineCap = "round";
+  for (let pass = 0; pass < 2; pass++) {
+    for (const l of links) {
+      const em = focus >= 0 && (l.s === focus || l.t === focus);
+      if (em !== (pass === 1)) continue;
+      const a = nodes[l.s], b = nodes[l.t];
+      const d = dim[l.s] || dim[l.t];
+      if (em) {
+        const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+        g.addColorStop(0, "rgba(245,165,36,.85)"); g.addColorStop(1, "rgba(245,165,36,.32)");
+        ctx.strokeStyle = g; ctx.lineWidth = 1.7 / cam.k;
+      } else {
+        ctx.strokeStyle = d ? "rgba(120,128,145,.06)"
+          : l.kind === "org" ? "rgba(45,212,191,.16)" : "rgba(150,158,175,.24)";
+        ctx.lineWidth = 1 / cam.k;
+      }
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+  }
+
+  // nodes
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i], isSel = i === selIdx, isHov = i === hoverIdx;
+    const d = dim[i] && !isSel;
+    const faded = focus >= 0 && !near.has(i);
+    ctx.globalAlpha = d ? .1 : faded ? .38 : 1;
+    const col = n.type === "org" ? ORG_COLOR : tieColor(n.ref.tie);
+    if (isSel || isHov) {
+      ctx.globalAlpha = d ? .35 : 1;
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 9 / cam.k, 0, 7);
+      ctx.fillStyle = "rgba(245,165,36,.13)"; ctx.fill();
+    }
+    ctx.fillStyle = col;
+    if (n.type === "org") {
+      ctx.save(); ctx.translate(n.x, n.y); ctx.rotate(Math.PI / 4);
+      const s = n.r * .82; ctx.fillRect(-s, -s, s * 2, s * 2); ctx.restore();
+    } else {
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 7); ctx.fill();
+    }
+    if (isSel) { ctx.lineWidth = 2.2 / cam.k; ctx.strokeStyle = "#FFF3DC"; ctx.stroke(); }
+    else if (near.has(i) && focus >= 0) { ctx.lineWidth = 1.4 / cam.k; ctx.strokeStyle = "rgba(255,243,220,.5)"; ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
+
+  // labels in screen space: constant size, crisp, and greedily decluttered so
+  // nothing ever overlaps — a dense hub shows its important names, not a smear
+  if (showLabels || focus >= 0) {
+    ctx.font = '500 11.5px "DM Sans", sans-serif';
+    ctx.textBaseline = "middle";
+    const cand = [];
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i], isSel = i === selIdx, isHov = i === hoverIdx;
+      if (dim[i] && !isSel) continue;
+      if (!showLabels && !isSel && !isHov && !near.has(i)) continue;
+      const s = toScreen(n.x, n.y);
+      if (s.x < -60 || s.x > W + 60 || s.y < 40 || s.y > H + 20) continue;
+      const prio = isSel ? 1e6 : isHov ? 9e5 : near.has(i) ? 8e5
+        : (n.type === "org" ? 400 : (n.ref.tie || 0) * 300) + n.deg * 20 + n.r;
+      cand.push({ i, n, s, prio, isSel, isHov });
+    }
+    cand.sort((a, b) => b.prio - a.prio);
+    const taken = [];
+    let drawn = 0;
+    for (const c of cand) {
+      if (drawn > 90 && c.prio < 8e5) break;
+      const w = ctx.measureText(c.n.label).width;
+      const x = c.s.x + c.n.r * cam.k + 5, y = c.s.y;
+      const box = { x: x - 2, y: y - 8, w: w + 4, h: 16 };
+      let clash = false;
+      for (const t of taken) {
+        if (box.x < t.x + t.w && box.x + box.w > t.x && box.y < t.y + t.h && box.y + box.h > t.y) { clash = true; break; }
+      }
+      if (clash) continue;
+      taken.push(box); drawn++;
+      ctx.globalAlpha = c.isSel || c.isHov ? 1 : c.prio >= 8e5 ? .95 : .8;
+      ctx.lineWidth = 3.2; ctx.strokeStyle = "rgba(10,11,13,.9)";
+      ctx.strokeText(c.n.label, x, y);
+      ctx.fillStyle = c.isSel ? "#FFF3DC" : c.n.type === "org" ? "rgba(45,212,191,.92)" : "rgba(233,235,239,.88)";
+      ctx.fillText(c.n.label, x, y);
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+let dirty = true;
+const invalidate = () => { dirty = true; };
+function tick(now) {
+  stepCam(now);
+  const running = alpha > ALPHA_MIN || dragNode;
+  if (running) simStep();
+  if (running || camAnim || dirty) { draw(); dirty = false; }
+  requestAnimationFrame(tick);
+}
+
+// ── hit testing / pointer ───────────────────────────────────
+function nodeAt(sx, sy) {
+  const w = toWorld(sx, sy), tol = 6 / cam.k;
+  let best = -1, bd = Infinity;
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const n = nodes[i], dx = n.x - w.x, dy = n.y - w.y, d2 = dx * dx + dy * dy;
+    const rr = (n.r + tol) ** 2;
+    if (d2 <= rr && d2 < bd) { bd = d2; best = i; }
+  }
+  return best;
+}
+
+let dragNode = null, pan = null, moved = 0;
+function wireCanvas() {
+  cv.addEventListener("wheel", e => {
+    e.preventDefault();
+    const before = toWorld(e.clientX, e.clientY);
+    const f = Math.exp(-e.deltaY * (e.ctrlKey ? .012 : .0022));
+    cam.k = Math.min(6, Math.max(.08, cam.k * f));
+    const after = toWorld(e.clientX, e.clientY);
+    cam.x += before.x - after.x; cam.y += before.y - after.y;
+    camAnim = null; invalidate();
+  }, { passive: false });
+
+  cv.addEventListener("pointerdown", e => {
+    cv.setPointerCapture(e.pointerId);
+    moved = 0; camAnim = null;
+    const i = nodeAt(e.clientX, e.clientY);
+    if (i >= 0) { dragNode = nodes[i]; dragNode.fixed = true; reheat(.32); }
+    else pan = { sx: e.clientX, sy: e.clientY, cx: cam.x, cy: cam.y };
+    cv.classList.add("grabbing");
+  });
+  addEventListener("pointermove", e => {
+    if (dragNode) {
+      const w = toWorld(e.clientX, e.clientY);
+      dragNode.x = w.x; dragNode.y = w.y; moved += 5; reheat(.28);
+    } else if (pan) {
+      cam.x = pan.cx - (e.clientX - pan.sx) / cam.k;
+      cam.y = pan.cy - (e.clientY - pan.sy) / cam.k;
+      moved += Math.abs(e.movementX) + Math.abs(e.movementY); invalidate();
+    } else {
+      const i = (e.target === cv && !palOpen) ? nodeAt(e.clientX, e.clientY) : -1;
+      if (i !== hoverIdx) {
+        hoverIdx = i;
+        cv.classList.toggle("pointing", i >= 0);
+        showTooltip(i, e.clientX, e.clientY); invalidate();
+      } else if (i >= 0) moveTooltip(e.clientX, e.clientY);
+    }
+  });
+  cv.addEventListener("pointerup", e => {
+    cv.classList.remove("grabbing");
+    if (dragNode) { dragNode.fixed = false; dragNode = null; }
+    const wasPan = pan; pan = null;
+    if (moved > 6) return;
+    const i = nodeAt(e.clientX, e.clientY);
+    if (i >= 0 && nodes[i].type === "person") select(nodes[i].ref.id);
+    else if (i >= 0 && nodes[i].type === "org") {
+      orgFilter = nodes[i].label; renderFilters(); renderActiveFilters();
+      egoSet = new Set([i]); neigh[i].forEach(([j]) => egoSet.add(j));
+      fitTo([...egoSet].map(j => nodes[j]), 90); invalidate();
+    }
+    else if (wasPan) { closeDrawer(); egoSet = null; orgFilter = ""; renderFilters(); renderActiveFilters(); invalidate(); }
+  });
+  cv.addEventListener("dblclick", e => {
+    const i = nodeAt(e.clientX, e.clientY);
+    invalidate();
+    if (i < 0) { egoSet = null; renderActiveFilters(); fitView(); return; }
+    egoSet = new Set([i]);
+    neigh[i].forEach(([j]) => { egoSet.add(j); neigh[j].forEach(([k]) => egoSet.add(k)); });
+    fitTo([...egoSet].map(j => nodes[j]), 90);
+  });
+}
+
+function showTooltip(i, x, y) {
+  const t = $("tooltip");
+  if (i < 0) { t.classList.remove("on"); return; }
+  const n = nodes[i];
+  t.innerHTML = n.type === "org"
+    ? `${esc(n.label)}<span class="m">organization</span>`
+    : `${esc(n.label)}<span class="m">${esc([n.ref.org, n.ref.city].filter(Boolean).join(" · ") || tieLabel(n.ref.tie))}</span>`;
+  t.classList.add("on"); moveTooltip(x, y);
+}
+function moveTooltip(x, y) {
+  const t = $("tooltip");
+  t.style.left = Math.min(x + 14, innerWidth - t.offsetWidth - 10) + "px";
+  t.style.top = (y + 18) + "px";
+}
+
+// ── selection + drawer ─────────────────────────────────────
+let creating = false;
+
+function select(id, zoom = true) {
+  selected = id; creating = false;
+  if (!idx.has("p" + id)) { pinned.add(id); buildGraph(); prewarm(220, 90); reheat(.22); }
+  const i = idx.get("p" + id);
+  invalidate();
+  renderDrawer(byId.get(id));
+  openDrawer();
+  if (zoom && i !== undefined) {
+    const list = [nodes[i], ...neigh[i].map(([j]) => nodes[j])];
+    fitTo(list, list.length > 1 ? 130 : 300);
+  }
+}
+function openDrawer() { $("drawer").classList.add("open"); document.body.classList.add("drawer-open"); invalidate(); }
+function closeDrawer() {
+  $("drawer").classList.remove("open"); document.body.classList.remove("drawer-open");
+  selected = null; creating = false; invalidate();
+}
+
+function renderDrawer(p) {
+  const d = $("drawer");
+  if (creating) return renderForm();
+  if (!p) { d.innerHTML = ""; return; }
+
+  const v = k => esc(p[k] != null ? p[k] : "");
+  const i = idx.get("p" + p.id);
+  const conn = [];
+  if (i !== undefined) neigh[i].forEach(([j, li]) => {
+    const l = links[li];
+    if (l.kind === "org") return;
+    conn.push({ id: nodes[j].id, label: nodes[j].label, kind: l.kind, a: l.ea, b: l.eb });
+  });
+
+  d.innerHTML = `
+    <div class="dr-head">
+      <div class="mono-avatar" id="drAvatar" style="color:${tieColor(p.tie)};border-color:${tieColor(p.tie)}44">${esc(initials(p.name))}</div>
+      <div class="dr-id">
+        <h2 id="drName">${esc(p.name)}</h2>
+        <div class="sub" id="drSub">${headChips(p)}</div>
+      </div>
+      <button class="btn btn-ghost btn-icon" id="closeDr" title="Close (esc)">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="dr-body">
+      <section class="blk"><h3>Record <em id="saveHint" class="hint">autosave</em></h3>
+        <div class="fld"><label class="fl">Full name</label><input id="f_name" value="${v("name")}"></div>
+        <div class="grid2">
+          <div class="fld"><label class="fl">City</label><input id="f_city" value="${v("city")}"></div>
+          <div class="fld"><label class="fl">Country</label><input id="f_country" value="${v("country")}"></div>
+        </div>
+        <div class="fld"><label class="fl">Relationship strength <em class="fl-hint" id="tieOut">${esc(tieLabel(p.tie))}</em></label>
+          <input type="range" id="f_tie" min="0" max="5" step="1" value="${p.tie || 0}" list="tieMarks"
+            style="width:100%;accent-color:${tieColor(p.tie)}">
+          <datalist id="tieMarks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option><option value="4"></option><option value="5"></option></datalist>
+          <div class="tie-ticks" id="tieTicks">${[1, 2, 3, 4, 5].map(n => `<span${p.tie === n ? ' class="on"' : ""}>${TIE_LABEL[n]}</span>`).join("")}</div></div>
+        <div class="grid2">
+          <div class="fld"><label class="fl">Birth date${p.age != null ? ` <em class="fl-hint">${p.age} years old</em>` : ""}</label>
+            <input type="date" id="f_bd" value="${v("birthdate")}"></div>
+          <div class="fld"><label class="fl">MM-DD if year is unknown</label><input id="f_bmd" value="${v("birthdayMd")}"></div>
+        </div>
+        <div class="grid2">
+          <div class="fld"><label class="fl">Where you met</label><input id="f_mw" value="${v("metWhere")}"></div>
+          <div class="fld"><label class="fl">When</label><input id="f_mn" value="${v("metWhen")}"></div>
+        </div>
+        <div class="fld"><label class="fl">LinkedIn
+          <a id="liOpen" class="fl-link" href="${v("linkedinUrl")}" target="_blank" rel="noopener"
+             style="${p.linkedinUrl ? "" : "display:none"}">open ↗</a></label>
+          <input id="f_li" value="${v("linkedinUrl")}"></div>
+        <div class="fld"><label class="fl">Summary</label><textarea id="f_sum">${v("summary")}</textarea></div>
+      </section>
+
+      <section class="blk"><h3>Direct links <em>${conn.length}</em></h3>
+        ${conn.length ? conn.map(c => `<div class="row-item">
+            <a class="lbl" data-goto="${c.id}"><span class="k">${esc(c.kind)}</span> ${esc(c.label)}</a>
+            <span class="x" data-de="${c.a}|${c.b}|${esc(c.kind)}">✕</span></div>`).join("")
+          : `<div class="none">no links recorded</div>`}
+        <div class="add">
+          <input id="et" list="people-dl" placeholder="person">
+          <select id="ek" style="max-width:110px">${EDGE_KINDS.map(k => `<option>${k}</option>`).join("")}</select>
+          <button class="btn btn-sm" id="addE">+</button>
+        </div>
+      </section>
+
+      <section class="blk"><h3>Organizations <em>${p.affiliations.length}</em></h3>
+        ${p.affiliations.length ? p.affiliations.map(a => `<div class="row-item">
+            <span class="lbl">${esc(a.org_name)}${a.role ? ` <span class="k">${esc(a.role)}</span>` : ""}</span>
+            <span class="x" data-da="${a.org_id}|${esc(a.role || "")}">✕</span></div>`).join("")
+          : `<div class="none">none</div>`}
+        <div class="add">
+          <input id="ao" list="orgs-dl" placeholder="organization">
+          <input id="ar" placeholder="role" style="max-width:110px">
+          <button class="btn btn-sm" id="addA">+</button>
+        </div>
+      </section>
+
+      <section class="blk"><h3>Interactions <em>${p.interactions.length}</em></h3>
+        ${p.interactions.length ? p.interactions.slice(0, 8).map(x => `<div class="ia">
+            <time>${esc(x.happened_on)}</time>
+            <div class="txt">${x.channel ? `<span class="ch">${esc(x.channel)}</span> ` : ""}${esc(x.summary || "—")}</div>
+            <span class="x" data-dx="${x.id}" style="opacity:.5">✕</span></div>`).join("")
+          : `<div class="none">nothing recorded</div>`}
+        <div class="add">
+          <input type="date" id="xd" style="max-width:132px">
+          <select id="xc" style="max-width:96px">${CHANNELS.map(c => `<option>${c}</option>`).join("")}</select>
+          <input id="xs" placeholder="what happened?">
+          <button class="btn btn-sm" id="addX">+</button>
+        </div>
+      </section>
+
+      <section class="blk"><h3>Identifiers <em>${p.identifiers.length}</em></h3>
+        ${p.identifiers.length ? p.identifiers.map(x => `<div class="row-item">
+            <span class="lbl"><span class="k">${esc(x.kind)}</span> ${esc(x.value)}</span>
+            <span class="x" data-di="${esc(x.kind)}|${esc(x.value)}">✕</span></div>`).join("")
+          : `<div class="none">none</div>`}
+        <div class="add">
+          <select id="ik" style="max-width:110px">
+            <option value="email">email</option><option value="phone">phone</option>
+            <option value="linkedin">linkedin</option><option value="whatsapp">whatsapp</option>
+            <option value="instagram">instagram</option></select>
+          <input id="iv" placeholder="value"><button class="btn btn-sm" id="addI">+</button>
+        </div>
+      </section>
+
+      <section class="blk"><h3>Facts <em>${p.facts.length}</em></h3>
+        ${p.facts.length ? p.facts.map(f => `<div class="row-item">
+            <span class="lbl"><span class="k">${esc(f.key)}</span> ${esc(f.value ?? f.num ?? f.date ?? "")}</span>
+            <span class="x" data-df="${f.id}">✕</span></div>`).join("")
+          : `<div class="none">none</div>`}
+        <div class="add">
+          <input id="fk" placeholder="key" style="max-width:118px">
+          <input id="fv" placeholder="value"><button class="btn btn-sm" id="addF">+</button>
+        </div>
+      </section>
+      <div id="derr" class="msg-err"></div>
+    </div>
+    <div class="dr-foot">
+      <button class="btn btn-ghost btn-icon" id="delBtn" title="Delete record">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v5M14 11v5"/></svg></button>
+    </div>`;
+
+  $("xd").value = new Date().toISOString().slice(0, 10);
+  const fail = e => { $("derr").textContent = e.message || String(e); toast(e.message || String(e), "err"); };
+  const run = (fn, ok) => (async () => { try { await fn(); toast(ok); await reload(p.id); } catch (e) { fail(e); } })();
+  const chk = r => { if (r.error) throw new Error(r.error.message); return r; };
+
+  $("closeDr").onclick = closeDrawer;
+  wireInlineFields(p);
+  d.querySelectorAll("[data-goto]").forEach(a => a.onclick = () => select(Number(a.dataset.goto)));
+
+  // Delete only this person. Cascades remove their links, identifiers,
+  // affiliations, facts, and interactions. Other people remain untouched.
+  $("delBtn").onclick = () => {
+    const bits = [
+      [conn.length, "link", "links"],
+      [p.identifiers.length, "identifier", "identifiers"],
+      [p.affiliations.length, "affiliation", "affiliations"],
+      [p.facts.length, "fact", "facts"],
+      [p.interactions.length, "interaction", "interactions"],
+    ].filter(([n]) => n > 0).map(([n, s, pl]) => `${n} ${n > 1 ? pl : s}`);
+    d.querySelector(".dr-foot").innerHTML = `
+      <div class="del-confirm">
+        <p>Delete <b>${esc(p.name)}</b>${bits.length ? ` with ${bits.join(", ")}` : ""}?
+          <span class="muted">No other person is affected. An archived copy makes this recoverable.</span></p>
+        <div class="del-actions">
+          <button class="btn" id="delNo">Cancel</button>
+          <button class="btn btn-danger" id="delYes">Delete</button>
+        </div>
+      </div>`;
+    $("delNo").onclick = () => renderDrawer(p);
+    $("delYes").onclick = async () => {
+      $("delYes").disabled = true;
+      try {
+        chk(await sb.rpc("delete_person", { p_id: p.id }));
+        pinned.delete(p.id);
+        toast(`${p.name} deleted`);
+        await reload();
+      } catch (e) { $("delYes").disabled = false; fail(e); }
+    };
+  };
+
+  d.querySelectorAll("[data-de]").forEach(x => x.onclick = () => run(async () => {
+    const [a, b, kind] = x.dataset.de.split("|");
+    chk(await sb.from("edges").delete().eq("a_id", +a).eq("b_id", +b).eq("kind", kind));
+  }, "link deleted"));
+  d.querySelectorAll("[data-da]").forEach(x => x.onclick = () => run(async () => {
+    const [org, role] = x.dataset.da.split("|");
+    chk(await sb.from("affiliations").delete().eq("person_id", p.id).eq("org_id", +org).eq("role", role));
+    const left = p.affiliations.filter(a => !(a.org_id === +org && (a.role || "") === role) && !a.until)[0];
+    chk(await sb.from("people").update({ current_org: left ? left.org_name : null, current_role: left ? left.role : null }).eq("id", p.id));
+  }, "affiliation deleted"));
+  d.querySelectorAll("[data-di]").forEach(x => x.onclick = () => run(async () => {
+    const [kind, value] = x.dataset.di.split("|");
+    chk(await sb.from("identifiers").delete().eq("kind", kind).eq("value", value));
+  }, "identifier deleted"));
+  d.querySelectorAll("[data-df]").forEach(x => x.onclick = () => run(async () =>
+    chk(await sb.from("facts").delete().eq("id", +x.dataset.df)), "fact deleted"));
+  d.querySelectorAll("[data-dx]").forEach(x => x.onclick = () => run(async () =>
+    chk(await sb.from("interactions").delete().eq("id", +x.dataset.dx)), "interaction deleted"));
+
+  $("addE").onclick = () => run(async () => {
+    const name = $("et").value.trim();
+    const t = DATA.people.find(q => q.name === name && q.id !== p.id);
+    if (!t) throw new Error("Person not found. Choose an exact name from the list.");
+    chk(await sb.from("edges").upsert({ a_id: p.id, b_id: t.id, kind: $("ek").value, source: "dashboard" }));
+  }, "link added");
+  $("addA").onclick = () => run(async () => {
+    const name = $("ao").value.trim(); if (!name) throw new Error("Organization name is empty.");
+    const role = $("ar").value.trim();
+    let org = DATA.orgs.find(o => o.name.toLowerCase() === name.toLowerCase());
+    if (!org) org = chk(await sb.from("orgs").insert({ name }).select().single()).data;
+    chk(await sb.from("affiliations").upsert({ person_id: p.id, org_id: org.id, role, source: "dashboard" }));
+    chk(await sb.from("people").update({ current_org: org.name, current_role: role || null }).eq("id", p.id));
+  }, "organization added");
+  $("addX").onclick = () => run(async () => {
+    const day = $("xd").value; if (!day) throw new Error("Date is required.");
+    chk(await sb.from("interactions").insert({
+      person_id: p.id, happened_on: day, channel: $("xc").value,
+      summary: $("xs").value.trim() || null, source: "dashboard",
+    }));
+  }, "interaction recorded");
+  $("addI").onclick = () => run(async () => {
+    const value = $("iv").value.trim(); if (!value) throw new Error("Value is empty.");
+    chk(await sb.from("identifiers").upsert({ person_id: p.id, kind: $("ik").value, value }));
+  }, "identifier added");
+  $("addF").onclick = () => run(async () => {
+    const key = $("fk").value.trim(); if (!key) throw new Error("Key is empty.");
+    chk(await sb.from("facts").insert({ person_id: p.id, key, value: $("fv").value.trim() || null, source: "dashboard" }));
+  }, "fact added");
+}
+
+// ── records edit and save inline ────────────────────────────
+const FIELDS = {
+  f_name:    { col: "full_name",    key: "name" },
+  f_city:    { col: "city",         key: "city" },
+  f_country: { col: "country",      key: "country" },
+  f_tie:     { col: "tie_strength", key: "tie", num: true },
+  f_bd:      { col: "birthdate",    key: "birthdate" },
+  f_bmd:     { col: "birthday_md",  key: "birthdayMd" },
+  f_mw:      { col: "met_where",    key: "metWhere" },
+  f_mn:      { col: "met_when",     key: "metWhen" },
+  f_li:      { col: "linkedin_url", key: "linkedinUrl" },
+  f_sum:     { col: "summary",      key: "summary" },
+};
+
+function headChips(p) {
+  return `<span class="chip" style="color:${tieColor(p.tie)};border-color:${tieColor(p.tie)}66">
+      <span class="dot" style="background:${tieColor(p.tie)}"></span>${esc(tieLabel(p.tie))}</span>
+    ${p.lastContact ? `<span class="chip">seen ${ago(p.days)}</span>` : ""}`;
+}
+
+function wireInlineFields(p) {
+  const hint = (txt, kind) => {
+    const h = $("saveHint"); if (!h) return;
+    h.textContent = txt; h.className = "hint" + (kind ? " " + kind : "");
+  };
+  const idle = () => hint("autosave");
+
+  for (const [id, f] of Object.entries(FIELDS)) {
+    const el = $(id); if (!el) continue;
+
+    if (id === "f_name") el.oninput = () => { $("drName").textContent = el.value.trim() || "—"; };
+    if (id === "f_li") el.oninput = () => {
+      const a = $("liOpen"), u = el.value.trim();
+      a.href = u; a.style.display = u ? "" : "none";
+    };
+    if (id === "f_tie") el.oninput = () => {
+      const t = +el.value;
+      $("tieOut").textContent = tieLabel(t);
+      el.style.accentColor = tieColor(t);
+      $("tieTicks").querySelectorAll("span").forEach((s, i) => s.classList.toggle("on", i + 1 === t));
+    };
+
+    el.onchange = async () => {
+      let val = el.value.trim() || null;
+      if (f.num) val = val ? +val : null;
+      if (id === "f_tie" && val === 0) val = null;
+      if (id === "f_name" && !val) { el.value = p.name; $("drName").textContent = p.name; return; }
+      if (val === (p[f.key] ?? null)) return;
+
+      hint("…");
+      const r = await sb.from("people").update({ [f.col]: val }).eq("id", p.id);
+      if (r.error) {
+        el.value = p[f.key] ?? "";
+        if (id === "f_name") $("drName").textContent = p.name;
+        hint(r.error.message, "err"); toast(r.error.message, "err");
+        return;
+      }
+
+      p[f.key] = val;
+      p._nname = norm(p.name);
+      p._hay = norm([p.name, p.org, p.city, p.role, p.country, p.summary].filter(Boolean).join(" "));
+      hint("saved"); setTimeout(idle, 1600);
+
+      if (id === "f_name" || id === "f_tie") {
+        const av = $("drAvatar");
+        av.textContent = initials(p.name);
+        av.style.color = tieColor(p.tie);
+        av.style.borderColor = tieColor(p.tie) + "44";
+        $("drSub").innerHTML = headChips(p);
+        buildGraph(); renderStats(); renderFilters(); invalidate();
+      } else if (id === "f_city" || id === "f_country") {
+        renderFilters();
+      }
+    };
+  }
+}
+
+// Existing records edit inline. This form only creates a person.
+function renderForm() {
+  const d = $("drawer");
+  d.innerHTML = `
+    <div class="dr-head">
+      <div class="mono-avatar">+</div>
+      <div class="dr-id"><h2>New person</h2></div>
+      <button class="btn btn-ghost btn-icon" id="closeDr">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="dr-body">
+      <div class="fld"><label class="fl">Full name</label><input id="f_name" autofocus></div>
+      <div class="grid2">
+        <div class="fld"><label class="fl">City</label><input id="f_city"></div>
+        <div class="fld"><label class="fl">Country</label><input id="f_country"></div>
+      </div>
+      <div class="fld"><label class="fl">Relationship strength</label><select id="f_tie">
+        <option value="">not rated</option>
+        ${[1, 2, 3, 4, 5].map(n => `<option value="${n}">${n}: ${TIE_LABEL[n]}</option>`).join("")}
+      </select></div>
+      <div class="grid2">
+        <div class="fld"><label class="fl">Birth date</label><input type="date" id="f_bd"></div>
+        <div class="fld"><label class="fl">MM-DD if year is unknown</label><input id="f_bmd"></div>
+      </div>
+      <div class="grid2">
+        <div class="fld"><label class="fl">Where you met</label><input id="f_mw"></div>
+        <div class="fld"><label class="fl">When</label><input id="f_mn"></div>
+      </div>
+      <div class="fld"><label class="fl">LinkedIn</label><input id="f_li"></div>
+      <div class="fld"><label class="fl">Summary</label><textarea id="f_sum"></textarea></div>
+      <div id="derr" class="msg-err"></div>
+    </div>
+    <div class="dr-foot">
+      <button class="btn btn-primary" id="saveBtn" style="flex:1;justify-content:center">Create</button>
+      <button class="btn" id="cancelBtn">Cancel</button>
+    </div>`;
+  $("f_name").focus();
+  const cancel = () => { creating = false; closeDrawer(); };
+  $("closeDr").onclick = cancel; $("cancelBtn").onclick = cancel;
+  $("saveBtn").onclick = async () => {
+    const body = {
+      full_name: $("f_name").value.trim(),
+      city: $("f_city").value.trim() || null, country: $("f_country").value.trim() || null,
+      tie_strength: $("f_tie").value ? +$("f_tie").value : null,
+      birthdate: $("f_bd").value || null, birthday_md: $("f_bmd").value.trim() || null,
+      met_where: $("f_mw").value.trim() || null, met_when: $("f_mn").value.trim() || null,
+      linkedin_url: $("f_li").value.trim() || null, summary: $("f_sum").value.trim() || null,
+    };
+    if (!body.full_name) { $("derr").textContent = "Name is required."; return; }
+    try {
+      const r = await sb.from("people").insert(body).select().single();
+      if (r.error) throw new Error(r.error.message);
+      creating = false;
+      toast("person created");
+      await reload(r.data.id);
+    } catch (e) { $("derr").textContent = e.message; toast(e.message, "err"); }
+  };
+}
+
+// ── command palette (directory) ───────────────────────────────
+let palOpen = false, palResults = [], palCursor = 0;
+
+function openPalette(seed) {
+  palOpen = true;
+  $("scrim").classList.add("open"); $("palette").classList.add("open");
+  $("palQ").value = seed || ""; renderPalette();
+  requestAnimationFrame(() => { $("palQ").focus(); $("palQ").select(); });
+}
+function closePalette() {
+  palOpen = false;
+  $("scrim").classList.remove("open"); $("palette").classList.remove("open");
+}
+function score(p, q) {
+  if (!q) return 1;
+  const n = p._nname;
+  if (n === q) return 1000;
+  if (n.startsWith(q)) return 900 - n.length;
+  const wi = n.indexOf(" " + q);
+  if (wi >= 0) return 800 - n.length;
+  if (n.includes(q)) return 700 - n.length;
+  if (p._hay.includes(q)) return 500 - p._hay.indexOf(q) * .1;
+  return 0;
+}
+function highlight(name, q) {
+  // match on the raw lowercase string so slice offsets stay valid (NFD would shift them)
+  if (!q) return esc(name);
+  const i = name.toLowerCase().indexOf(q);
+  if (i < 0) return esc(name);
+  return esc(name.slice(0, i)) + "<mark>" + esc(name.slice(i, i + q.length)) + "</mark>" + esc(name.slice(i + q.length));
+}
+function renderPalette() {
+  const q = norm($("palQ").value.trim());
+  let list;
+  if (q) {
+    list = DATA.people.map(p => ({ p, s: score(p, q) })).filter(x => x.s > 0)
+      .sort((a, b) => b.s - a.s || a.p.name.localeCompare(b.p.name)).map(x => x.p);
+  } else {
+    list = DATA.people.slice().sort((a, b) => (b.tie || 0) - (a.tie || 0) || a.name.localeCompare(b.name));
+  }
+  palResults = list; palCursor = 0;
+  const shown = list.slice(0, 220);
+  $("palCount").textContent = `${list.length} / ${DATA.people.length}`;
+  $("palList").innerHTML = shown.length ? `
+    <div class="pal-sec"><span>${q ? "Results" : "Directory: closest first"}</span>
+      <span class="mono">${shown.length < list.length ? shown.length + " shown" : ""}</span></div>
+    ${shown.map((p, i) => `
+      <div class="pal-row" role="option" data-i="${i}" aria-selected="${i === 0}">
+        <div class="mono-avatar" style="color:${tieColor(p.tie)};border-color:${tieColor(p.tie)}44">${esc(initials(p.name))}</div>
+        <div class="pal-main">
+          <div class="pal-name">${highlight(p.name, q)}</div>
+          <div class="pal-meta">${esc([p.org && (p.role ? `${p.org} — ${p.role}` : p.org), p.city].filter(Boolean).join(" · ") || tieLabel(p.tie))}</div>
+        </div>
+        <div class="pal-right">
+          ${p.lastContact ? `<span class="pal-ago">${ago(p.days)}</span>` : ""}
+          <span class="dot" style="background:${tieColor(p.tie)}"></span>
+          <svg class="icon pal-go" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </div>
+      </div>`).join("")}`
+    : `<div class="pal-empty">No one matches “${esc($("palQ").value)}”.<br>
+        <button class="btn btn-sm" id="palNew" style="margin-top:12px">Create this person</button></div>`;
+  $("palList").querySelectorAll(".pal-row").forEach(r => {
+    r.onclick = () => pick(+r.dataset.i);
+    r.onmouseenter = () => setCursor(+r.dataset.i, false);
+  });
+  if ($("palNew")) $("palNew").onclick = () => { closePalette(); newPerson($("palQ").value.trim()); };
+}
+function setCursor(i, scroll = true) {
+  const rows = $("palList").querySelectorAll(".pal-row");
+  if (!rows.length) return;
+  palCursor = Math.max(0, Math.min(rows.length - 1, i));
+  rows.forEach((r, j) => r.setAttribute("aria-selected", j === palCursor));
+  if (scroll) rows[palCursor].scrollIntoView({ block: "nearest" });
+}
+function pick(i) {
+  const p = palResults[i ?? palCursor];
+  if (!p) return;
+  closePalette();
+  select(p.id);
+}
+function newPerson(name) {
+  creating = true; selected = null;
+  renderForm(); openDrawer();
+  if (name) $("f_name").value = name;
+}
+
+// ── filters UI ────────────────────────────────────────────
+function renderFilters() {
+  $("ties").innerHTML = [0, 1, 2, 3, 4, 5].map(t => `
+    <button class="tie-btn" data-tie="${t}" aria-pressed="${tieFilter.has(String(t))}" title="${tieLabel(t || null)}">
+      <span class="sw" style="background:${tieColor(t)}"></span>${t || "—"}</button>`).join("");
+  $("ties").querySelectorAll("[data-tie]").forEach(b => b.onclick = () => {
+    const k = b.dataset.tie;
+    tieFilter.has(k) ? tieFilter.delete(k) : tieFilter.add(k);
+    if (!tieFilter.size) tieFilter = new Set(ALL_TIES);
+    renderFilters(); renderActiveFilters(); invalidate();
+  });
+  const orgs = [...new Set(DATA.people.map(p => p.org).filter(Boolean))].sort();
+  $("orgFilter").innerHTML = `<option value="">all organizations</option>` +
+    orgs.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
+  $("orgFilter").value = orgFilter;
+  $("orgs-dl").innerHTML = DATA.orgs.map(o => `<option value="${esc(o.name)}">`).join("");
+  $("people-dl").innerHTML = DATA.people.map(p => `<option value="${esc(p.name)}">`).join("");
+}
+function renderActiveFilters() {
+  const chips = [];
+  if (orgFilter) chips.push(`<span class="chip">org <b>${esc(orgFilter)}</b><button data-clr="org">✕</button></span>`);
+  if (tieFilter.size < ALL_TIES.length) chips.push(`<span class="chip">strength <b>${[...tieFilter].sort().map(t => t === "0" ? "—" : t).join(" ")}</b><button data-clr="tie">✕</button></span>`);
+  if (egoSet) chips.push(`<span class="chip">isolated neighborhood<button data-clr="ego">✕</button></span>`);
+  $("activeFilters").innerHTML = chips.join("");
+  $("activeFilters").querySelectorAll("[data-clr]").forEach(b => b.onclick = () => {
+    const k = b.dataset.clr;
+    if (k === "org") orgFilter = "";
+    if (k === "tie") tieFilter = new Set(ALL_TIES);
+    if (k === "ego") { egoSet = null; fitView(); }
+    renderFilters(); renderActiveFilters(); invalidate();
+  });
+}
+
+// ── wiring ─────────────────────────────────────────────
+function wire() {
+  wireCanvas();
+
+  $("searchTrigger").onclick = () => openPalette();
+  $("scrim").onclick = closePalette;
+  $("palQ").oninput = renderPalette;
+  $("newBtn").onclick = () => newPerson();
+  $("zoomIn").onclick = () => animateCam(cam.x, cam.y, Math.min(6, cam.k * 1.45), 240);
+  $("zoomOut").onclick = () => animateCam(cam.x, cam.y, Math.max(.08, cam.k / 1.45), 240);
+  $("fitBtn").onclick = () => { egoSet = null; renderActiveFilters(); fitView(); };
+
+  const pop = $("filterPop");
+  const placePop = () => {
+    const r = $("filterBtn").getBoundingClientRect();
+    pop.style.left = Math.max(10, Math.min(r.right - 290, innerWidth - 300)) + "px";
+  };
+  $("filterBtn").onclick = e => { e.stopPropagation(); placePop(); pop.classList.toggle("open"); };
+  document.addEventListener("click", e => {
+    if (!pop.contains(e.target) && e.target !== $("filterBtn")) pop.classList.remove("open");
+  });
+  $("orgFilter").onchange = () => { orgFilter = $("orgFilter").value; renderActiveFilters(); invalidate(); };
+  $("showIsolated").onchange = e => { showIsolated = e.target.checked; buildGraph(); reheat(.5); };
+  $("showOrgs").onchange = e => { showOrgs = e.target.checked; buildGraph(); reheat(.5); };
+  $("showLabels").onchange = e => { showLabels = e.target.checked; invalidate(); };
+  $("resetBtn").onclick = () => {
+    orgFilter = ""; tieFilter = new Set(ALL_TIES); egoSet = null;
+    showIsolated = false; showOrgs = showLabels = true;
+    $("showIsolated").checked = false;
+    $("showOrgs").checked = $("showLabels").checked = true;
+    buildGraph(); renderFilters(); renderActiveFilters(); reheat(.5); fitView();
+    pop.classList.remove("open");
+  };
+
+  addEventListener("keydown", e => {
+    const mod = e.metaKey || e.ctrlKey;
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+
+    if (mod && (e.key === "k" || e.key === "f")) { e.preventDefault(); palOpen ? closePalette() : openPalette(); return; }
+    if (mod && e.shiftKey && e.key.toLowerCase() === "n") { e.preventDefault(); closePalette(); newPerson(); return; }
+
+    if (palOpen) {
+      if (e.key === "Escape") { e.preventDefault(); closePalette(); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); setCursor(palCursor + 1); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setCursor(palCursor - 1); }
+      else if (e.key === "Enter") { e.preventDefault(); pick(); }
+      return;
+    }
+    if (typing) return;
+
+    if (e.key === "Escape") { pop.classList.remove("open"); if (egoSet) { egoSet = null; renderActiveFilters(); invalidate(); } else closeDrawer(); }
+    else if (e.key === "/" ) { e.preventDefault(); openPalette(); }
+    else if (e.key === "f" || e.key === "F") { egoSet = null; renderActiveFilters(); fitView(); }
+    else if (e.key === "e" && selected != null) { e.preventDefault(); $("f_name")?.focus(); }
+  });
+}
+</script>
+</body>
+</html>

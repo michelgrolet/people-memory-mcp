@@ -1,0 +1,4 @@
+interface:
+  display_name: "Set up People Memory"
+  short_description: "Connect a private people graph to your agent"
+  default_prompt: "Set up People Memory for my agent and ask me which data sources and deployment I want."

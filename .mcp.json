@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "people-memory": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/michelgrolet/people-memory-mcp",
+        "people-memory-mcp"
+      ]
+    }
+  }
+}

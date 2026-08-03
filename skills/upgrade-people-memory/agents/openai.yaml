@@ -1,0 +1,4 @@
+interface:
+  display_name: "Upgrade People Memory"
+  short_description: "Upgrade the schema, MCP, API, UI, and skills safely"
+  default_prompt: "Upgrade People Memory, back up first, apply migrations, and verify my data still works."

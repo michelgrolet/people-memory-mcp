@@ -1,0 +1,64 @@
+[build-system]
+requires = ["hatchling>=1.29"]
+build-backend = "hatchling.build"
+
+[project]
+name = "people-memory-mcp"
+version = "0.1.0"
+description = "A private people graph that gives your AI agent durable memory"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "Michel Grolet" }]
+keywords = ["mcp", "agents", "contacts", "personal-crm", "knowledge-graph"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+  "mcp>=2.0,<3",
+  "psycopg[binary]>=3.2.9,<4",
+  "sqlparse>=0.5.3,<1",
+]
+
+[project.optional-dependencies]
+api = [
+  "fastapi>=0.116,<1",
+  "uvicorn[standard]>=0.35,<1",
+]
+dev = [
+  "httpx>=0.28,<1",
+  "pglast>=7.7,<8",
+  "pytest>=8.4,<9",
+  "pytest-cov>=6.2,<7",
+  "ruff>=0.12,<1",
+]
+
+[project.scripts]
+people-memory = "people_memory.cli:main"
+people-memory-mcp = "people_memory.server:main"
+
+[project.urls]
+Homepage = "https://github.com/michelgrolet/people-memory-mcp"
+Repository = "https://github.com/michelgrolet/people-memory-mcp"
+Issues = "https://github.com/michelgrolet/people-memory-mcp/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/people_memory"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = ["integration: requires PEOPLE_MEMORY_TEST_DATABASE_URL"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

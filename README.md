@@ -1,0 +1,246 @@
+# People Memory
+
+Give your AI agent a private, durable memory of everyone you know.
+
+People Memory is a personal people graph with an MCP server, PostgreSQL schema, optional REST API,
+browser UI, importers, and agent skills. It remembers people across conversations, retrieves someone
+as soon as you mention them, records durable facts, and asks before it merges ambiguous identities.
+
+Your data stays in your PostgreSQL database. The repository contains no hosted service, telemetry,
+contact data, or credentials.
+
+## What it does
+
+- Maps people, organizations, relationships, affiliations, identifiers, facts, and interactions.
+- Gives Codex, Claude Code, and other MCP clients semantic tools plus guarded SQL.
+- Teaches the agent to look up names before answering and save durable facts during every chat.
+- Imports LinkedIn Connections, Google Contacts, and WhatsApp chat exports.
+- Can enrich records through connectors the user approves, including Gmail, Calendar, and Drive.
+- Runs fully local with Supabase CLI or in the cloud with any PostgreSQL database.
+- Recommends a free Supabase project because it includes Postgres, Auth, REST, and a local stack.
+- Includes a full-screen relationship graph and searchable directory.
+- Refuses uncertain merges and conflicting overwrites until the user decides.
+
+## How it fits together
+
+```mermaid
+flowchart LR
+  Agent["Your existing agent"] --> MCP["People Memory MCP"]
+  MCP --> PG[("PostgreSQL")]
+  Agent --> Connectors["Optional Gmail / Calendar / Drive / WhatsApp connectors"]
+  Connectors --> MCP
+  UI["Private graph UI"] --> Supabase["Supabase Auth + REST"]
+  Supabase --> PG
+  API["Optional REST API"] --> PG
+```
+
+The MCP server provides live reads and controlled writes. The bundled skills provide the behavior:
+when to retrieve, what to remember, how to import, when to ask, and how to upgrade safely.
+
+## Quick start
+
+Requirements: Python 3.11+, [`uv`](https://docs.astral.sh/uv/), Docker, and the
+[Supabase CLI](https://supabase.com/docs/guides/local-development).
+
+```bash
+git clone https://github.com/michelgrolet/people-memory-mcp.git
+cd people-memory-mcp
+uv sync --extra api --extra dev
+supabase start
+supabase db reset
+```
+
+`supabase status` prints the local database URL, API URL, and browser publishable key. Save the
+database URL in `~/.config/people-memory/.env`:
+
+```dotenv
+PEOPLE_MEMORY_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+PEOPLE_MEMORY_ENABLE_RAW_SQL=false
+PEOPLE_MEMORY_DEFAULT_SOURCE=agent
+```
+
+The file is read automatically and should have mode `0600`.
+
+Set your owner email before using the UI:
+
+```sql
+update app_settings set value = 'you@example.com' where key = 'owner_email';
+```
+
+Then configure the browser app:
+
+```bash
+cp web/config.example.js web/config.js
+# add the API URL and publishable key printed by `supabase status`
+python3 -m http.server 4173 --directory web
+```
+
+Open [http://127.0.0.1:4173](http://127.0.0.1:4173). Local signup emails appear in Supabase
+Mailpit, whose URL is also printed by `supabase status`.
+
+## Connect an agent
+
+The interactive wizard detects Codex and Claude Code:
+
+```bash
+uv run people-memory setup
+```
+
+Or add the server directly.
+
+Codex:
+
+```bash
+codex mcp add people-memory \
+  --env PEOPLE_MEMORY_ENV_FILE="$HOME/.config/people-memory/.env" \
+  -- uvx --from git+https://github.com/michelgrolet/people-memory-mcp people-memory-mcp
+```
+
+Claude Code:
+
+```bash
+claude mcp add -s user people-memory \
+  -e PEOPLE_MEMORY_ENV_FILE="$HOME/.config/people-memory/.env" \
+  -- uvx --from git+https://github.com/michelgrolet/people-memory-mcp people-memory-mcp
+```
+
+Start a new agent session after adding an MCP server. Install or invoke `setup-people-memory` from
+the plugin to add the durable memory rule, choose imports, connect optional data sources, and verify
+the complete flow.
+
+### Install the agent skills from a clone
+
+Codex discovers skills in `~/.agents/skills`; Claude Code uses `~/.claude/skills`. Symlink every
+People Memory skill so updates to the clone are picked up automatically:
+
+```bash
+mkdir -p "$HOME/.agents/skills"
+for skill in "$PWD"/skills/*; do
+  ln -s "$skill" "$HOME/.agents/skills/$(basename "$skill")"
+done
+```
+
+Use `~/.claude/skills` instead for Claude Code. Restart the agent, then ask it to run
+`setup-people-memory`. The repository is also packaged as a Codex plugin for marketplace or team
+distribution.
+
+## MCP tools
+
+| Tool | Purpose |
+|---|---|
+| `search_people` | Search names, organizations, roles, cities, identifiers, summaries, and facts |
+| `get_person` | Return a complete person record, or candidates when a name is ambiguous |
+| `remember_person` | Create or update a person without silent duplicate merges or overwrites |
+| `add_fact` | Save typed or free-form facts with source and confidence |
+| `record_interaction` | Record a call, message, meeting, meal, or other dated interaction |
+| `connect_people` | Record how two people know each other |
+| `find_intro_path` | Find warm introduction paths into an organization |
+| `stale_contacts` | Find strong relationships that have gone quiet |
+| `read_query` | Run one guarded `SELECT` for advanced analysis |
+| `write_query` | Run one guarded `INSERT`, `UPDATE`, or `DELETE` |
+
+Raw SQL is disabled by default. If enabled, it rejects multiple statements, DDL, dangerous
+functions, multiple data-changing operations, and `UPDATE`/`DELETE` without a `WHERE` clause.
+`read_query` also runs inside a read-only transaction with a bounded result set.
+
+## Imports
+
+Official exports are the safest default. They are inspectable and do not require sharing account
+passwords.
+
+```bash
+uv run people-memory import linkedin ~/Downloads/Connections.csv
+uv run people-memory import google ~/Downloads/contacts.csv
+uv run people-memory import whatsapp ~/Downloads/chat.txt --self-name "Your Name" --date-order dmy
+```
+
+Imports resolve email or phone first, then name. They fill missing values and never overwrite a
+conflict silently. The `import-contacts` skill can inspect unfamiliar CSV columns and guide the user
+through ambiguous matches.
+
+## Optional connectors
+
+People Memory does not collect Gmail, Calendar, Drive, or WhatsApp credentials. The `enrich-people`
+skill uses connectors already authorized in the user's agent. It asks which sources may be read,
+limits the time range, shows what it plans to save, and marks every fact with its source.
+
+Supported patterns include:
+
+- Gmail: participants, signatures, organizations, and last interaction dates.
+- Calendar: meetings, attendees, locations, and interaction dates.
+- Drive: user-selected documents that mention known people.
+- WhatsApp: official exports by default; a self-hosted MCP bridge is optional.
+- Browser agents: Codex in Chrome or Claude in Chrome can help configure Supabase and inspect the UI.
+
+See [docs/connectors.md](docs/connectors.md) for the permission and identity rules.
+
+## Hosted Supabase
+
+Create a free Supabase project, then apply the checked-in migrations:
+
+```bash
+supabase login
+supabase link --project-ref YOUR_PROJECT_REF
+supabase db push
+```
+
+Set `owner_email`, enable the desired Auth providers, and deploy `web/` to a static host. The browser
+uses only the publishable key. Row-level security rejects every account except the configured owner.
+The MCP server uses a direct PostgreSQL URL stored outside Git.
+
+For an existing non-Supabase PostgreSQL database, apply only
+`supabase/migrations/20260803000000_core.sql` and use the optional API for browser access.
+
+## Optional REST API
+
+```bash
+uv run --extra api people-memory api --host 127.0.0.1 --port 8765
+```
+
+Set `PEOPLE_MEMORY_API_TOKEN` to require `Authorization: Bearer ...`. Keep the API on loopback unless
+you put it behind TLS, authentication, rate limits, and backups.
+
+## Skills
+
+- `setup-people-memory`: choose local/cloud deployment, configure an existing agent, select imports,
+  offer approved connectors, start the UI, and verify the install.
+- `remember-people`: retrieve on name mention and save durable human facts during conversation.
+- `import-contacts`: import and deduplicate official exports.
+- `enrich-people`: use approved Gmail, Calendar, Drive, browser, or WhatsApp connectors.
+- `maintain-people-memory`: audit duplicates, conflicts, stale ties, and data quality.
+- `upgrade-people-memory`: back up, migrate, upgrade the MCP/UI/skills, and verify data.
+
+If the user does not already have an agent, the setup skill can create a minimal Codex or Claude Code
+workspace from `templates/` and connect People Memory to it.
+
+## Privacy and safety
+
+This database contains third-party personal data. Treat it accordingly.
+
+- One database per person is the default design.
+- Hosted UI access is restricted with Supabase Auth and forced row-level security.
+- The browser publishable key is safe to expose only because RLS is enabled.
+- The service-role key and PostgreSQL password must never enter browser code or Git.
+- Connector access is opt-in per source. Imported and inferred facts keep provenance.
+- Delete archives a JSON snapshot in `deleted_records` before cascading dependent rows.
+- Back up before schema upgrades or bulk merges.
+
+Read [docs/privacy.md](docs/privacy.md) and [SECURITY.md](SECURITY.md) before exposing any component
+to the internet.
+
+## Development
+
+```bash
+uv sync --extra api --extra dev
+uv run ruff check .
+uv run pytest --cov=people_memory
+supabase db reset
+```
+
+The project uses the current stable v2 line of the official
+[MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) and the latest Supabase migration
+workflow.
+
+## License
+
+[MIT](LICENSE)

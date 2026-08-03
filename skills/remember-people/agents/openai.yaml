@@ -1,0 +1,4 @@
+interface:
+  display_name: "Remember people"
+  short_description: "Recall and save durable facts about people"
+  default_prompt: "Use my people graph while we talk and remember durable facts about anyone I mention."
