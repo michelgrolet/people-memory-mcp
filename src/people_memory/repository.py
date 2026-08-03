@@ -298,11 +298,20 @@ class GraphRepository:
                 person_id = conn.execute(
                     """
                     insert into people (
-                      full_name, current_org, "current_role", city, country, summary
+                      full_name, current_org, "current_role", linkedin_url,
+                      city, country, summary
                     )
-                    values (%s, %s, %s, %s, %s, %s) returning id
+                    values (%s, %s, %s, %s, %s, %s, %s) returning id
                     """,
-                    (full_name, current_org, current_role, city, country, summary),
+                    (
+                        full_name,
+                        current_org,
+                        current_role,
+                        linkedin_url,
+                        city,
+                        country,
+                        summary,
+                    ),
                 ).fetchone()["id"]
                 created = True
 
