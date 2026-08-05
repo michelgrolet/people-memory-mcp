@@ -95,3 +95,27 @@ def test_people_memory_end_to_end() -> None:
     assert repo.status()["people"] == 1
     archived = repo.read_query("select record_type, record_id from deleted_records")
     assert archived == [{"record_type": "person", "record_id": ada["person"]["id"]}]
+
+
+def test_resolve_person_single_fuzzy_match_needs_confirmation() -> None:
+    repo = _repo()
+    with repo.db.connection() as conn:
+        conn.execute(
+            "truncate deleted_records, interactions, facts, edges, affiliations, identifiers, "
+            "orgs, people restart identity cascade"
+        )
+    created = repo.remember_person(
+        full_name="Michel Grolet", confirmed_new=True, source="test"
+    )
+    assert created["status"] == "created"
+
+    # Exact name still resolves straight away.
+    exact = repo.resolve_person("Michel Grolet")
+    assert exact["status"] == "resolved"
+    assert exact["person"]["full_name"] == "Michel Grolet"
+
+    # A partial/fuzzy query matching exactly one row must NOT silently resolve:
+    # it should ask for confirmation, even though there is only one candidate.
+    fuzzy = repo.resolve_person("Michel")
+    assert fuzzy["status"] == "needs_confirmation"
+    assert [c["full_name"] for c in fuzzy["candidates"]] == ["Michel Grolet"]
