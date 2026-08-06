@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import csv
+import json
 import re
+import urllib.error
+import urllib.request
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
+
+LINKEDIN_SNAPSHOT_URL = "https://api.linkedin.com/rest/memberSnapshotData"
+LINKEDIN_API_VERSION = "202312"
 
 
 @dataclass
@@ -40,39 +46,78 @@ def _first(row: dict[str, str], *names: str) -> str | None:
     return None
 
 
+def _connection_record_from_row(row: dict[str, str]) -> ContactRecord | None:
+    """Shared by the CSV export and the live API — both use the same column names
+    (First Name, Last Name, Company, Position, Connected On, URL, Email Address)."""
+    first = _first(row, "First Name") or ""
+    last = _first(row, "Last Name") or ""
+    full_name = f"{first} {last}".strip()
+    if not full_name:
+        return None
+    connected = _first(row, "Connected On")
+    connected_on = None
+    if connected:
+        for fmt in ("%d %b %Y", "%d %B %Y", "%m/%d/%Y", "%Y-%m-%d"):
+            try:
+                connected_on = datetime.strptime(connected, fmt).date()
+                break
+            except ValueError:
+                pass
+    email = normalize_email(_first(row, "Email Address"))
+    return ContactRecord(
+        full_name=full_name,
+        first_name=first or None,
+        last_name=last or None,
+        emails=[email] if email else [],
+        organization=_first(row, "Company"),
+        role=_first(row, "Position"),
+        linkedin_url=_first(row, "URL"),
+        connected_on=connected_on,
+        source="linkedin",
+    )
+
+
 def parse_linkedin_csv(path: Path) -> list[ContactRecord]:
     lines = path.read_text(encoding="utf-8-sig", errors="replace").splitlines()
     start = next((i for i, line in enumerate(lines) if "First Name" in line), 0)
     records: list[ContactRecord] = []
     for row in csv.DictReader(lines[start:]):
-        first = _first(row, "First Name") or ""
-        last = _first(row, "Last Name") or ""
-        full_name = f"{first} {last}".strip()
-        if not full_name:
-            continue
-        connected = _first(row, "Connected On")
-        connected_on = None
-        if connected:
-            for fmt in ("%d %b %Y", "%d %B %Y", "%m/%d/%Y", "%Y-%m-%d"):
-                try:
-                    connected_on = datetime.strptime(connected, fmt).date()
-                    break
-                except ValueError:
-                    pass
-        email = normalize_email(_first(row, "Email Address"))
-        records.append(
-            ContactRecord(
-                full_name=full_name,
-                first_name=first or None,
-                last_name=last or None,
-                emails=[email] if email else [],
-                organization=_first(row, "Company"),
-                role=_first(row, "Position"),
-                linkedin_url=_first(row, "URL"),
-                connected_on=connected_on,
-                source="linkedin",
-            )
-        )
+        record = _connection_record_from_row(row)
+        if record is not None:
+            records.append(record)
+    return records
+
+
+def fetch_linkedin_connections(access_token: str, *, timeout: float = 30.0) -> list[ContactRecord]:
+    """Fetch 1st-degree connections live via LinkedIn's Member Data Portability API
+    (Member Snapshot API, domain=CONNECTIONS). Requires an OAuth token with the
+    r_dma_portability_self_serve (or r_dma_portability_3rd_party) scope — see
+    https://learn.microsoft.com/en-us/linkedin/dma/member-data-portability/.
+
+    Raises RuntimeError (with LinkedIn's own message) if the domain isn't collated
+    yet — common right after a member first consents, LinkedIn processes it async.
+    """
+    request = urllib.request.Request(
+        f"{LINKEDIN_SNAPSHOT_URL}?q=criteria&domain=CONNECTIONS",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Linkedin-Version": LINKEDIN_API_VERSION,
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body = json.loads(exc.read().decode("utf-8"))
+        raise RuntimeError(f"LinkedIn API error {exc.code}: {body.get('message', body)}") from exc
+
+    records: list[ContactRecord] = []
+    for element in payload.get("elements", []):
+        for row in element.get("snapshotData", []):
+            record = _connection_record_from_row(row)
+            if record is not None:
+                records.append(record)
     return records
 
 

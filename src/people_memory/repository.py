@@ -236,9 +236,9 @@ class GraphRepository:
                     conn.execute(
                         """
                         select id, full_name, current_org, city,
-                               similarity(lower(full_name), lower(%s)) as similarity
+                               extensions.similarity(lower(full_name), lower(%s)) as similarity
                         from people
-                        where similarity(lower(full_name), lower(%s)) >= 0.62
+                        where extensions.similarity(lower(full_name), lower(%s)) >= 0.62
                         order by similarity desc limit 5
                         """,
                         (full_name, full_name),
