@@ -1521,11 +1521,39 @@ function select(id, zoom = true) {
     fitTo(list, list.length > 1 ? 130 : 300);
   }
 }
-function openDrawer() { $("drawer").classList.add("open"); document.body.classList.add("drawer-open"); invalidate(); }
+function openDrawer() { $("drawer").classList.add("open"); document.body.classList.add("drawer-open"); invalidate(); ensureOverlayHistoryState(); }
 function closeDrawer() {
   $("drawer").classList.remove("open"); document.body.classList.remove("drawer-open");
   selected = null; selectedOrgId = null; creating = false; invalidate();
+  releaseOverlayHistoryStateIfIdle();
 }
+
+// ── mobile back/swipe should close the palette or drawer, not exit the PWA ──
+// (neither overlay pushes a history entry per keystroke/rerender — only on open — and a
+// palette→drawer transition, e.g. picking a result, reuses the same entry instead of
+// popping+pushing, since a synchronous history.back() followed by pushState() races.)
+let overlayStatePushed = false, suppressNextPopstate = false;
+function anyOverlayOpen() { return palOpen || $("drawer").classList.contains("open"); }
+function ensureOverlayHistoryState() {
+  if (!overlayStatePushed) { history.pushState({ ppOverlay: true }, "", location.href); overlayStatePushed = true; }
+}
+function releaseOverlayHistoryStateIfIdle() {
+  // deferred to a microtask: a palette→drawer transition (pick()) closes one and opens the
+  // other synchronously, so we must check "is anything still open" only after that settles.
+  queueMicrotask(() => {
+    if (overlayStatePushed && !anyOverlayOpen()) {
+      suppressNextPopstate = true;
+      overlayStatePushed = false;
+      history.back();
+    }
+  });
+}
+window.addEventListener("popstate", () => {
+  if (suppressNextPopstate) { suppressNextPopstate = false; return; }
+  overlayStatePushed = false;
+  if (palOpen) closePalette();
+  if ($("drawer").classList.contains("open")) closeDrawer();
+});
 
 function selectOrg(id, zoom = true) {
   const org = DATA.orgs.find(o => o.id === id);
@@ -2027,10 +2055,12 @@ function openPalette(seed) {
   $("scrim").classList.add("open"); $("palette").classList.add("open");
   $("palQ").value = seed || ""; renderPalette();
   requestAnimationFrame(() => { $("palQ").focus(); $("palQ").select(); });
+  ensureOverlayHistoryState();
 }
 function closePalette() {
   palOpen = false;
   $("scrim").classList.remove("open"); $("palette").classList.remove("open");
+  releaseOverlayHistoryStateIfIdle();
 }
 function score(p, q) {
   if (!q) return 1;
