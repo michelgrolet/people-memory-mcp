@@ -570,6 +570,9 @@
       <label class="toggle">Color links by type
         <input type="checkbox" id="colorByKind"><span class="sw-track"></span>
       </label>
+      <label class="toggle">Show agents
+        <input type="checkbox" id="showAgents" checked><span class="sw-track"></span>
+      </label>
     </div>
     <div class="grp"><button class="btn" id="resetBtn" style="width:100%;justify-content:center">Reset all</button></div>
   </div>
@@ -674,6 +677,7 @@ const TIE_LABEL = {1:"contact",2:"acquaintance",3:"friend",4:"close",5:"inner ci
 const TIE_COLOR = ["#4A4F5C","#727888","#9B8B6C","#C79C4E","#EDB13C","#FFD36E"];
 const ALL_TIES = ["0", "1", "2", "3", "4", "5"];
 const ORG_COLOR = "#2DD4BF";
+const AGENT_COLOR = "#C084FC";
 const EDGE_KIND_COLOR = {
   friend: "#5B9BF2", family: "#F2739A", partner: "#D66BE0", colleague: "#8C7CF0",
   classmate: "#F2C94C", knows: "#9AA7BD", sibling: "#F2916B", neighbour: "#6FCF7A",
@@ -909,7 +913,7 @@ async function load() {
   affs.data.forEach(a => { a.org_name = orgName.get(a.org_id); push(affsBy, a.person_id, a); });
 
   DATA.people = people.data.map(p => ({
-    id: p.id, name: p.full_name, org: p.current_org, role: p.current_role, city: p.city,
+    id: p.id, name: p.full_name, kind: p.kind || "human", org: p.current_org, role: p.current_role, city: p.city,
     country: p.country, tie: p.tie_strength, age: p.age, birthdate: p.birthdate,
     birthdayMd: p.birthday_md, metWhere: p.met_where, metWhen: p.met_when,
     linkedinUrl: p.linkedin_url, summary: p.summary,
@@ -1063,7 +1067,7 @@ function renderInsights() {
 
 // ── graph model ───────────────────────────────────────────
 let nodes = [], links = [], idx = new Map(), degree = [];
-let showIsolated = false, showOrgs = true, showLabels = true, colorByKind = false;
+let showIsolated = false, showOrgs = true, showLabels = true, colorByKind = false, showAgents = true;
 let orgFilter = "", tieFilter = new Set(ALL_TIES);
 let selected = null;
 let selectedOrgId = null;
@@ -1086,7 +1090,12 @@ function buildGraph() {
     }, o));
     return i;
   };
-  const addP = id => { const p = byId.get(id); return p ? add("p" + id, { type: "person", id, label: p.name, ref: p }) : -1; };
+  const addP = id => {
+    const p = byId.get(id);
+    if (!p) return -1;
+    if (p.kind === "agent" && !showAgents) return -1;
+    return add("p" + id, { type: "person", id, label: p.name, ref: p });
+  };
   const addO = id => {
     const o = DATA.orgs.find(x => x.id === id);
     return o ? add("o" + id, { type: "org", id, label: o.name, ref: o }) : -1;
@@ -1327,7 +1336,8 @@ function draw() {
     const d = dim[i] && !isSel;
     const faded = focus >= 0 && !near.has(i);
     ctx.globalAlpha = d ? .1 : faded ? .38 : 1;
-    const col = n.type === "org" ? ORG_COLOR : tieColor(n.ref.tie);
+    const isAgent = n.type === "person" && n.ref.kind === "agent";
+    const col = n.type === "org" ? ORG_COLOR : isAgent ? AGENT_COLOR : tieColor(n.ref.tie);
     if (isSel || isHov) {
       ctx.globalAlpha = d ? .35 : 1;
       ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 9 / cam.k, 0, 7);
@@ -1337,6 +1347,16 @@ function draw() {
     if (n.type === "org") {
       ctx.save(); ctx.translate(n.x, n.y); ctx.rotate(Math.PI / 4);
       const s = n.r * .82; ctx.fillRect(-s, -s, s * 2, s * 2); ctx.restore();
+    } else if (isAgent) {
+      // hexagon — visually distinct from both the person circle and the org diamond,
+      // an agent isn't "closer/further" the way tie_strength implies for a human.
+      ctx.beginPath();
+      for (let k = 0; k < 6; k++) {
+        const ang = Math.PI / 3 * k - Math.PI / 2;
+        const px = n.x + n.r * Math.cos(ang), py = n.y + n.r * Math.sin(ang);
+        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath(); ctx.fill();
     } else {
       ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 7); ctx.fill();
     }
@@ -1632,7 +1652,7 @@ function renderDrawer(p) {
 
   d.innerHTML = `
     <div class="dr-head">
-      <div class="mono-avatar" id="drAvatar" style="color:${tieColor(p.tie)};border-color:${tieColor(p.tie)}44">${esc(initials(p.name))}</div>
+      <div class="mono-avatar" id="drAvatar" style="color:${p.kind === "agent" ? AGENT_COLOR : tieColor(p.tie)};border-color:${p.kind === "agent" ? AGENT_COLOR : tieColor(p.tie)}44">${esc(initials(p.name))}</div>
       <div class="dr-id">
         <h2 id="drName">${esc(p.name)}</h2>
         <div class="sub" id="drSub">${headChips(p)}</div>
@@ -1643,6 +1663,7 @@ function renderDrawer(p) {
     <div class="dr-body">
       <section class="blk"><h3>Record <em id="saveHint" class="hint">autosave</em></h3>
         <div class="fld"><label class="fl">Full name</label><input id="f_name" value="${v("name")}"></div>
+        ${p.kind === "agent" ? "" : `
         <div class="grid2">
           <div class="fld"><label class="fl">City</label><input id="f_city" value="${v("city")}"></div>
           <div class="fld"><label class="fl">Country</label><input id="f_country" value="${v("country")}"></div>
@@ -1656,7 +1677,7 @@ function renderDrawer(p) {
           <div class="fld"><label class="fl">Birth date${p.age != null ? ` <em class="fl-hint">${p.age} years old</em>` : ""}</label>
             <input type="date" id="f_bd" value="${v("birthdate")}"></div>
           <div class="fld"><label class="fl">MM-DD if year is unknown</label><input id="f_bmd" value="${v("birthdayMd")}"></div>
-        </div>
+        </div>`}
         <div class="grid2">
           <div class="fld"><label class="fl">Where you met</label><input id="f_mw" value="${v("metWhere")}"></div>
           <div class="fld"><label class="fl">When</label><input id="f_mn" value="${v("metWhen")}"></div>
@@ -1865,6 +1886,11 @@ const FIELDS = {
 };
 
 function headChips(p) {
+  if (p.kind === "agent") {
+    return `<span class="chip" style="color:${AGENT_COLOR};border-color:${AGENT_COLOR}66">
+        <span class="dot" style="background:${AGENT_COLOR}"></span>Agent</span>
+      ${p.lastContact ? `<span class="chip">seen ${ago(p.days)}</span>` : ""}`;
+  }
   return `<span class="chip" style="color:${tieColor(p.tie)};border-color:${tieColor(p.tie)}66">
       <span class="dot" style="background:${tieColor(p.tie)}"></span>${esc(tieLabel(p.tie))}</span>
     ${p.lastContact ? `<span class="chip">seen ${ago(p.days)}</span>` : ""}`;
@@ -2170,11 +2196,12 @@ function wire() {
     $("kindLegend").classList.toggle("show", colorByKind);
     invalidate();
   };
+  $("showAgents").onchange = e => { showAgents = e.target.checked; buildGraph(); reheat(.5); };
   $("resetBtn").onclick = () => {
     orgFilter = ""; tieFilter = new Set(ALL_TIES); egoSet = null;
-    showIsolated = false; showOrgs = showLabels = true; colorByKind = false;
+    showIsolated = false; showOrgs = showLabels = showAgents = true; colorByKind = false;
     $("showIsolated").checked = false;
-    $("showOrgs").checked = $("showLabels").checked = true;
+    $("showOrgs").checked = $("showLabels").checked = $("showAgents").checked = true;
     $("colorByKind").checked = false;
     $("kindLegend").classList.remove("show");
     buildGraph(); renderFilters(); renderActiveFilters(); reheat(.5); fitView();
