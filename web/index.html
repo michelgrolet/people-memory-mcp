@@ -464,6 +464,14 @@
     .md-field .md-expand{width:30px;height:30px}
     .md-field-inline .md-expand{width:26px;height:26px;top:2px;right:2px}
   }
+
+  /* ── sync status popover ─────────────────────────────── */
+  .sync-row{display:flex;align-items:center;gap:9px;padding:8px 2px}
+  .sync-row+.sync-row{border-top:1px solid var(--line)}
+  .sync-row .sy-main{flex:1;min-width:0}
+  .sync-row .sy-name{font-size:13px;color:var(--txt)}
+  .sync-row .sy-when{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .sync-row .chip{flex:0 0 auto;font-weight:600}
 </style>
 </head>
 <body>
@@ -513,6 +521,9 @@
       <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
       <span class="btn-txt">Person</span>
     </button>
+    <button class="btn btn-ghost btn-icon" id="statusBtn" title="Sync status">
+      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+    </button>
     <button class="btn btn-ghost btn-icon" id="logoutBtn" title="Sign out">
       <svg class="icon" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
     </button>
@@ -539,6 +550,11 @@
       </label>
     </div>
     <div class="grp"><button class="btn" id="resetBtn" style="width:100%;justify-content:center">Reset all</button></div>
+  </div>
+
+  <div class="pop" id="statusPop">
+    <h4>Sync status</h4>
+    <div id="statusList"><div class="none">loading…</div></div>
   </div>
 
   <div id="activeFilters"></div>
@@ -631,6 +647,12 @@ const TIE_COLOR = ["#4A4F5C","#727888","#9B8B6C","#C79C4E","#EDB13C","#FFD36E"];
 const ALL_TIES = ["0", "1", "2", "3", "4", "5"];
 const ORG_COLOR = "#2DD4BF";
 const EXPAND_ICON = '<svg class="icon" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m11-5v3a2 2 0 0 0-2 2h-3"/></svg>';
+const SYNC_LABELS = {
+  sync_backup: "Backup",
+  sync_linkedin: "LinkedIn sync",
+  sync_interactions_whatsapp: "WhatsApp interactions",
+  sync_interactions_email: "Email interactions",
+};
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
@@ -647,6 +669,10 @@ function ago(days) {
   if (days < 365) return Math.round(days / 30.4) + "m";
   const y = days / 365;
   return (y < 10 ? y.toFixed(1) : Math.round(y)) + "a";
+}
+function fmtSyncWhen(ms) {
+  if (!ms) return "";
+  return new Date(ms).toLocaleString(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 // ── toasts ─────────────────────────────────────────────────
@@ -882,6 +908,34 @@ function renderStats() {
   $("stats").innerHTML = [
     [s.people, "people"], [s.edges, "links"], [s.orgs, "orgs"], [s.close, "close"],
   ].map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join("");
+}
+
+// ── sync status (recurring daemon mechanisms: backup, LinkedIn, WhatsApp/email interactions) ──
+// These run outside this app (in the daemon) and persist their own state elsewhere; the only
+// trace visible here is the summary JSON each one best-effort writes to app_settings.
+async function loadSyncStatus() {
+  const list = $("statusList");
+  const keys = Object.keys(SYNC_LABELS);
+  const { data, error } = await sb.from("app_settings").select("key,value").in("key", keys);
+  if (error) { list.innerHTML = `<div class="none" style="color:var(--red)">${esc(error.message)}</div>`; return; }
+  const byKey = new Map((data || []).map(r => [r.key, r.value]));
+  list.innerHTML = keys.map(key => {
+    const label = SYNC_LABELS[key];
+    const raw = byKey.get(key);
+    let state = null;
+    if (raw != null) { try { state = JSON.parse(raw); } catch { state = null; } }
+    if (!state) {
+      return `<div class="sync-row">
+        <div class="sy-main"><div class="sy-name">${esc(label)}</div><div class="sy-when">never run yet</div></div>
+        <span class="chip" style="color:var(--muted)">—</span>
+      </div>`;
+    }
+    const color = state.ok ? "var(--ok)" : "var(--red)";
+    return `<div class="sync-row" title="${esc(state.detail || "")}">
+      <div class="sy-main"><div class="sy-name">${esc(label)}</div><div class="sy-when">${esc(fmtSyncWhen(state.lastRunMs))}</div></div>
+      <span class="chip" style="color:${color};border-color:${color}">${state.ok ? "✓ ok" : "✗ error"}</span>
+    </div>`;
+  }).join("");
 }
 
 // ── graph model ───────────────────────────────────────────
@@ -1834,8 +1888,22 @@ function wire() {
     pop.style.left = Math.max(10, Math.min(r.right - 290, innerWidth - 300)) + "px";
   };
   $("filterBtn").onclick = e => { e.stopPropagation(); placePop(); pop.classList.toggle("open"); };
+
+  const statusPop = $("statusPop");
+  const placeStatusPop = () => {
+    const r = $("statusBtn").getBoundingClientRect();
+    statusPop.style.left = Math.max(10, Math.min(r.right - 290, innerWidth - 300)) + "px";
+  };
+  $("statusBtn").onclick = e => {
+    e.stopPropagation(); placeStatusPop();
+    const opening = !statusPop.classList.contains("open");
+    statusPop.classList.toggle("open");
+    if (opening) loadSyncStatus();
+  };
+
   document.addEventListener("click", e => {
     if (!pop.contains(e.target) && e.target !== $("filterBtn")) pop.classList.remove("open");
+    if (!statusPop.contains(e.target) && e.target !== $("statusBtn")) statusPop.classList.remove("open");
   });
   $("orgFilter").onchange = () => { orgFilter = $("orgFilter").value; renderActiveFilters(); invalidate(); };
   $("showIsolated").onchange = e => { showIsolated = e.target.checked; buildGraph(); reheat(.5); };
@@ -1866,7 +1934,7 @@ function wire() {
     }
     if (typing) return;
 
-    if (e.key === "Escape") { pop.classList.remove("open"); if (egoSet) { egoSet = null; renderActiveFilters(); invalidate(); } else closeDrawer(); }
+    if (e.key === "Escape") { pop.classList.remove("open"); statusPop.classList.remove("open"); if (egoSet) { egoSet = null; renderActiveFilters(); invalidate(); } else closeDrawer(); }
     else if (e.key === "/" ) { e.preventDefault(); openPalette(); }
     else if (e.key === "f" || e.key === "F") { egoSet = null; renderActiveFilters(); fitView(); }
     else if (e.key === "e" && selected != null) { e.preventDefault(); $("f_name")?.focus(); }
