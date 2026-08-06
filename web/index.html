@@ -6,6 +6,12 @@
 <meta name="theme-color" content="#0A0B0D">
 <title>People Memory</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="People">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
@@ -337,6 +343,36 @@
     #palette{top:0;left:0;transform:none;width:100%;border-radius:0;height:100%;display:flex;flex-direction:column}
     #palette.open{transform:none}
     .pal-list{max-height:none;flex:1}
+
+    /* ── top bar: fit small screens without wrapping/clipping ── */
+    #top{padding:0 10px;gap:7px}
+    .brand{gap:6px;font-size:14px}
+    .brand-txt{display:none}
+    #searchTrigger{min-width:44px;min-height:44px;justify-content:center;padding:7px}
+    #kbdHint{display:none}
+    .btn-txt{display:none}
+    #filterBtn,#newBtn{padding:7px;justify-content:center;min-width:44px}
+
+    /* ── touch targets: ≥44px for standalone controls ── */
+    .btn{min-height:44px}
+    .btn-icon{width:44px;height:44px}
+    .btn-sm{min-height:44px;padding:8px 10px}
+    #zoomctl .btn{width:44px;height:44px}
+    .row-item{min-height:44px}
+    .row-item .x{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;font-size:16px}
+    .ia{padding:10px 0;align-items:center}
+    .ia .x{width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center}
+    #activeFilters .chip button{padding:8px}
+
+    /* ── forms: one column, stacked inputs are easier to tap ── */
+    .grid2{grid-template-columns:1fr}
+    .add{flex-wrap:wrap}
+    .add>input,.add>select,.add>.md-field-inline{flex:1 1 100%}
+    .add>.btn{flex:1 1 100%;justify-content:center}
+    .dr-foot{flex-wrap:wrap}
+    .dr-foot>.btn{flex:1 1 auto;justify-content:center}
+
+    .pop{width:min(290px,calc(100vw - 20px))}
   }
   @media (prefers-reduced-motion:reduce){
     *{animation-duration:.01ms!important;transition-duration:.01ms!important}
@@ -424,6 +460,9 @@
     .md-modal-preview{border-left:none;border-top:1px solid var(--line)}
     #mdModal{top:0;left:0;transform:none;width:100%;height:100%;border-radius:0}
     #mdModal.open{transform:none}
+    /* placed after the .md-field rules above so it wins the cascade at equal specificity */
+    .md-field .md-expand{width:30px;height:30px}
+    .md-field-inline .md-expand{width:26px;height:26px;top:2px;right:2px}
   }
 </style>
 </head>
@@ -458,7 +497,7 @@
   </div>
 
   <header id="top">
-    <div class="brand"><span class="mark">⊙</span> People Memory <span class="who" id="whoami"></span></div>
+    <div class="brand"><span class="mark">⊙</span> <span class="brand-txt">People Memory</span> <span class="who" id="whoami"></span></div>
     <div class="stats" id="stats"></div>
     <div class="spacer"></div>
     <button id="searchTrigger" title="Directory (⌘K)">
@@ -468,11 +507,11 @@
     </button>
     <button class="btn" id="filterBtn">
       <svg class="icon" viewBox="0 0 24 24"><path d="M3 5h18M6 12h12M10 19h4"/></svg>
-      Filters
+      <span class="btn-txt">Filters</span>
     </button>
     <button class="btn btn-primary" id="newBtn" title="New person (⌘⇧N)">
       <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-      Person
+      <span class="btn-txt">Person</span>
     </button>
     <button class="btn btn-ghost btn-icon" id="logoutBtn" title="Sign out">
       <svg class="icon" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
@@ -1833,6 +1872,11 @@ function wire() {
     else if (e.key === "e" && selected != null) { e.preventDefault(); $("f_name")?.focus(); }
   });
 }
+</script>
+<script>
+  if ("serviceWorker" in navigator) {
+    addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+  }
 </script>
 </body>
 </html>
