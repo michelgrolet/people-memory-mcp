@@ -262,6 +262,13 @@
   .row-item .x{color:var(--muted);cursor:pointer;padding:0 2px;line-height:1;opacity:0;transition:opacity 130ms,color 130ms}
   .row-item:hover .x{opacity:1}
   .row-item .x:hover{color:var(--red)}
+  .row-item .copy-btn{
+    background:none;border:0;color:var(--muted);cursor:pointer;padding:2px;line-height:1;
+    display:flex;opacity:0;transition:opacity 130ms,color 130ms;flex:0 0 auto;
+  }
+  .row-item:hover .copy-btn{opacity:1}
+  .row-item .copy-btn:hover{color:var(--accent2)}
+  .row-item .copy-btn .icon{width:13px;height:13px}
   .none{font-size:12.5px;color:var(--muted);font-style:italic}
   .add{display:flex;gap:5px;margin-top:7px}
   .add input,.add select{padding:6px 8px;font-size:12.5px;min-width:0}
@@ -360,6 +367,7 @@
     #zoomctl .btn{width:44px;height:44px}
     .row-item{min-height:44px}
     .row-item .x{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;font-size:16px}
+    .row-item .copy-btn{width:30px;height:30px;justify-content:center;opacity:.65}
     .ia{padding:10px 0;align-items:center}
     .ia .x{width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center}
     #activeFilters .chip button{padding:8px}
@@ -647,6 +655,7 @@ const TIE_COLOR = ["#4A4F5C","#727888","#9B8B6C","#C79C4E","#EDB13C","#FFD36E"];
 const ALL_TIES = ["0", "1", "2", "3", "4", "5"];
 const ORG_COLOR = "#2DD4BF";
 const EXPAND_ICON = '<svg class="icon" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m11-5v3a2 2 0 0 0-2 2h-3"/></svg>';
+const COPY_ICON = '<svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
 const SYNC_LABELS = {
   sync_backup: "Backup",
   sync_linkedin: "LinkedIn sync",
@@ -857,7 +866,7 @@ async function fetchAll(build) {
 async function load() {
   const [people, orgs, edges, affs, idents, facts, inter] = await Promise.all([
     fetchAll(() => sb.from("person").select("*").order("full_name")),
-    fetchAll(() => sb.from("orgs").select("id,name").order("name")),
+    fetchAll(() => sb.from("orgs").select("id,name,kind,domain,city,country,note").order("name")),
     fetchAll(() => sb.from("edges").select("a_id,b_id,kind,strength").order("a_id")),
     fetchAll(() => sb.from("affiliations").select("person_id,org_id,role,since,until").order("person_id")),
     fetchAll(() => sb.from("identifiers").select("person_id,kind,value").order("person_id")),
@@ -943,6 +952,7 @@ let nodes = [], links = [], idx = new Map(), degree = [];
 let showIsolated = false, showOrgs = true, showLabels = true;
 let orgFilter = "", tieFilter = new Set(ALL_TIES);
 let selected = null;
+let selectedOrgId = null;
 // people with no link at all are not on the graph by default; opening one from the
 // The directory pins a selection so it can appear alone without showing every isolated person.
 const pinned = new Set();
@@ -1331,6 +1341,7 @@ function wireCanvas() {
       orgFilter = nodes[i].label; renderFilters(); renderActiveFilters();
       egoSet = new Set([i]); neigh[i].forEach(([j]) => egoSet.add(j));
       fitTo([...egoSet].map(j => nodes[j]), 90); invalidate();
+      selectOrg(nodes[i].ref.id, false);
     }
     else if (wasPan) { closeDrawer(); egoSet = null; orgFilter = ""; renderFilters(); renderActiveFilters(); invalidate(); }
   });
@@ -1363,7 +1374,7 @@ function moveTooltip(x, y) {
 let creating = false;
 
 function select(id, zoom = true) {
-  selected = id; creating = false;
+  selected = id; selectedOrgId = null; creating = false;
   if (!idx.has("p" + id)) { pinned.add(id); buildGraph(); prewarm(220, 90); reheat(.22); }
   const i = idx.get("p" + id);
   invalidate();
@@ -1377,7 +1388,88 @@ function select(id, zoom = true) {
 function openDrawer() { $("drawer").classList.add("open"); document.body.classList.add("drawer-open"); invalidate(); }
 function closeDrawer() {
   $("drawer").classList.remove("open"); document.body.classList.remove("drawer-open");
-  selected = null; creating = false; invalidate();
+  selected = null; selectedOrgId = null; creating = false; invalidate();
+}
+
+function selectOrg(id, zoom = true) {
+  const org = DATA.orgs.find(o => o.id === id);
+  if (!org) return;
+  selectedOrgId = id; selected = null; creating = false;
+  invalidate();
+  renderOrgDrawer(org);
+  openDrawer();
+  const i = idx.get("o" + id);
+  if (zoom && i !== undefined) {
+    const list = [nodes[i], ...neigh[i].map(([j]) => nodes[j])];
+    fitTo(list, list.length > 1 ? 130 : 300);
+  }
+}
+
+function renderOrgDrawer(o) {
+  const d = $("drawer");
+  const v = k => esc(o[k] != null ? o[k] : "");
+  const people = DATA.affs
+    .filter(a => a.org_id === o.id)
+    .map(a => ({ ...a, person: byId.get(a.person_id) }))
+    .filter(a => a.person)
+    .sort((a, b) => a.person.name.localeCompare(b.person.name));
+
+  d.innerHTML = `
+    <div class="dr-head">
+      <div class="mono-avatar" style="color:${ORG_COLOR};border-color:${ORG_COLOR}44">${esc(initials(o.name))}</div>
+      <div class="dr-id">
+        <h2 id="drName">${esc(o.name)}</h2>
+        <div class="sub"><span class="chip">organization</span></div>
+      </div>
+      <button class="btn btn-ghost btn-icon" id="closeDr" title="Close (esc)">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="dr-body">
+      <section class="blk"><h3>Record <em id="orgSaveHint" class="hint">autosave</em></h3>
+        <div class="fld"><label class="fl">Name</label><input id="o_name" value="${v("name")}"></div>
+        <div class="grid2">
+          <div class="fld"><label class="fl">Kind</label><input id="o_kind" placeholder="company, school, nonprofit…" value="${v("kind")}"></div>
+          <div class="fld"><label class="fl">Domain</label><input id="o_domain" placeholder="acme.com" value="${v("domain")}"></div>
+        </div>
+        <div class="grid2">
+          <div class="fld"><label class="fl">City</label><input id="o_city" value="${v("city")}"></div>
+          <div class="fld"><label class="fl">Country</label><input id="o_country" value="${v("country")}"></div>
+        </div>
+        <div class="fld"><label class="fl">Note</label>
+          <div class="md-field" data-md-for="o_note">
+            <div class="md-view" id="o_note_view"></div>
+            <textarea id="o_note" hidden>${v("note")}</textarea>
+            <button type="button" class="md-expand" data-expand="o_note" title="Expand editor">${EXPAND_ICON}</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="blk"><h3>People <em>${people.length}</em></h3>
+        ${people.length ? people.map(a => `<div class="row-item">
+            <a class="lbl" data-goto="${a.person.id}">${esc(a.person.name)}${a.role ? ` <span class="k">${esc(a.role)}</span>` : ""}</a>
+          </div>`).join("")
+          : `<div class="none">no one recorded here yet</div>`}
+      </section>
+    </div>`;
+
+  $("closeDr").onclick = closeDrawer;
+  d.querySelectorAll("[data-goto]").forEach(a => a.onclick = () => select(Number(a.dataset.goto)));
+  wireMdViewField("o_note", "Note", "Click to write a note…");
+
+  const ORG_FIELDS = { o_name: "name", o_kind: "kind", o_domain: "domain", o_city: "city", o_country: "country", o_note: "note" };
+  const hint = (txt, kind) => { const h = $("orgSaveHint"); if (!h) return; h.textContent = txt; h.className = "hint" + (kind ? " " + kind : ""); };
+  for (const [id, col] of Object.entries(ORG_FIELDS)) {
+    $(id).onchange = async () => {
+      const val = $(id).value.trim() || null;
+      if (val === (o[col] ?? null)) return;
+      hint("…");
+      const r = await sb.from("orgs").update({ [col]: val }).eq("id", o.id);
+      if (r.error) { $(id).value = o[col] ?? ""; hint(r.error.message, "err"); toast(r.error.message, "err"); return; }
+      o[col] = val;
+      if (id === "o_name") { $("drName").textContent = val || "—"; renderFilters(); }
+      hint("saved"); setTimeout(() => hint("autosave"), 1600);
+    };
+  }
 }
 
 function renderDrawer(p) {
@@ -1452,7 +1544,7 @@ function renderDrawer(p) {
 
       <section class="blk"><h3>Organizations <em>${p.affiliations.length}</em></h3>
         ${p.affiliations.length ? p.affiliations.map(a => `<div class="row-item">
-            <span class="lbl">${esc(a.org_name)}${a.role ? ` <span class="k">${esc(a.role)}</span>` : ""}</span>
+            <a class="lbl" data-goto-org="${a.org_id}">${esc(a.org_name)}${a.role ? ` <span class="k">${esc(a.role)}</span>` : ""}</a>
             <span class="x" data-da="${a.org_id}|${esc(a.role || "")}">✕</span></div>`).join("")
           : `<div class="none">none</div>`}
         <div class="add">
@@ -1482,6 +1574,7 @@ function renderDrawer(p) {
       <section class="blk"><h3>Identifiers <em>${p.identifiers.length}</em></h3>
         ${p.identifiers.length ? p.identifiers.map(x => `<div class="row-item">
             <span class="lbl"><span class="k">${esc(x.kind)}</span> ${esc(x.value)}</span>
+            <button type="button" class="copy-btn" data-copy="${esc(x.value)}" title="Copy value">${COPY_ICON}</button>
             <span class="x" data-di="${esc(x.kind)}|${esc(x.value)}">✕</span></div>`).join("")
           : `<div class="none">none</div>`}
         <div class="add">
@@ -1496,6 +1589,7 @@ function renderDrawer(p) {
       <section class="blk"><h3>Facts <em>${p.facts.length}</em></h3>
         ${p.facts.length ? p.facts.map(f => `<div class="row-item">
             <span class="lbl"><span class="k">${esc(f.key)}</span> <span class="mdi">${mdRenderInline(f.value ?? f.num ?? f.date ?? "")}</span></span>
+            <button type="button" class="copy-btn" data-copy="${esc(f.value ?? f.num ?? f.date ?? "")}" title="Copy value">${COPY_ICON}</button>
             <span class="x" data-df="${f.id}">✕</span></div>`).join("")
           : `<div class="none">none</div>`}
         <div class="add">
@@ -1525,6 +1619,11 @@ function renderDrawer(p) {
   wireMdExpand("fv", "Fact value");
   wireMdExpand("xs", "Interaction note");
   d.querySelectorAll("[data-goto]").forEach(a => a.onclick = () => select(Number(a.dataset.goto)));
+  d.querySelectorAll("[data-goto-org]").forEach(a => a.onclick = () => selectOrg(Number(a.dataset.gotoOrg)));
+  d.querySelectorAll("[data-copy]").forEach(btn => btn.onclick = async () => {
+    try { await navigator.clipboard.writeText(btn.dataset.copy); toast("copied"); }
+    catch { toast("copy failed — select the text manually", "err"); }
+  });
 
   // Delete only this person. Cascades remove their links, identifiers,
   // affiliations, facts, and interactions. Other people remain untouched.
