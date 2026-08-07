@@ -170,6 +170,10 @@
   #legend .ramp{display:flex;gap:2px;margin:0 2px}
   #legend .ramp i{width:10px;height:10px;border-radius:50%}
   #legend .dia{width:9px;height:9px;transform:rotate(45deg)}
+  #kindLegend{display:none;flex-wrap:wrap;gap:4px 12px;max-width:230px;margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+  #kindLegend.show{display:flex}
+  #kindLegend .kl{display:flex;align-items:center;gap:5px;white-space:nowrap}
+  #kindLegend .kl i{width:8px;height:8px;border-radius:50%;flex:none}
   #zoomctl{position:fixed;right:14px;bottom:14px;z-index:30;display:flex;flex-direction:column;gap:6px;transition:transform 320ms var(--ease)}
   #zoomctl .btn{background:rgba(20,22,25,.85);backdrop-filter:blur(10px)}
   body.drawer-open #zoomctl{transform:translateX(-396px)}
@@ -256,6 +260,13 @@
   .row-item .x{color:var(--muted);cursor:pointer;padding:0 2px;line-height:1;opacity:0;transition:opacity 130ms,color 130ms}
   .row-item:hover .x{opacity:1}
   .row-item .x:hover{color:var(--red)}
+  .row-item .copy-btn{
+    background:none;border:0;color:var(--muted);cursor:pointer;padding:2px;line-height:1;
+    display:flex;opacity:0;transition:opacity 130ms,color 130ms;flex:0 0 auto;
+  }
+  .row-item:hover .copy-btn{opacity:1}
+  .row-item .copy-btn:hover{color:var(--accent2)}
+  .row-item .copy-btn .icon{width:13px;height:13px}
   .none{font-size:12.5px;color:var(--muted);font-style:italic}
   .add{display:flex;gap:5px;margin-top:7px}
   .add input,.add select{padding:6px 8px;font-size:12.5px;min-width:0}
@@ -341,6 +352,18 @@
   @media (prefers-reduced-motion:reduce){
     *{animation-duration:.01ms!important;transition-duration:.01ms!important}
   }
+
+  /* ── sync status popover ─────────────────────────────── */
+  .sync-row{display:flex;align-items:center;gap:9px;padding:8px 2px}
+  .sync-row+.sync-row{border-top:1px solid var(--line)}
+  .sync-row .sy-main{flex:1;min-width:0}
+  .sync-row .sy-name{font-size:13px;color:var(--txt)}
+  .sync-row .sy-when{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .sync-row .chip{flex:0 0 auto;font-weight:600}
+
+  /* ── insights popover ────────────────────────────────── */
+  #insightsList{max-height:min(56vh,420px);overflow-y:auto}
+  #insightsList .grp .row-item .lbl .k{display:block;margin-top:1px}
 </style>
 </head>
 <body>
@@ -390,6 +413,12 @@
       <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
       Person
     </button>
+    <button class="btn btn-ghost btn-icon" id="insightsBtn" title="Insights">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+    </button>
+    <button class="btn btn-ghost btn-icon" id="statusBtn" title="Sync status">
+      <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+    </button>
     <button class="btn btn-ghost btn-icon" id="logoutBtn" title="Sign out">
       <svg class="icon" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
     </button>
@@ -414,8 +443,24 @@
       <label class="toggle">Show names on graph
         <input type="checkbox" id="showLabels" checked><span class="sw-track"></span>
       </label>
+      <label class="toggle">Color links by type
+        <input type="checkbox" id="colorByKind"><span class="sw-track"></span>
+      </label>
+      <label class="toggle">Show agents
+        <input type="checkbox" id="showAgents" checked><span class="sw-track"></span>
+      </label>
     </div>
     <div class="grp"><button class="btn" id="resetBtn" style="width:100%;justify-content:center">Reset all</button></div>
+  </div>
+
+  <div class="pop" id="statusPop">
+    <h4>Sync status</h4>
+    <div id="statusList"><div class="none">loading…</div></div>
+  </div>
+
+  <div class="pop" id="insightsPop">
+    <h4>Insights</h4>
+    <div id="insightsList"></div>
   </div>
 
   <div id="activeFilters"></div>
@@ -430,6 +475,7 @@
     </div>
     <div class="row"><span class="dia" style="background:var(--org)"></span> organization</div>
     <div class="row" style="opacity:.65">unconnected people stay in the directory <kbd>⌘K</kbd></div>
+    <div id="kindLegend"></div>
   </div>
 
   <div id="zoomctl">
@@ -486,6 +532,19 @@ const TIE_LABEL = {1:"contact",2:"acquaintance",3:"friend",4:"close",5:"inner ci
 const TIE_COLOR = ["#4A4F5C","#727888","#9B8B6C","#C79C4E","#EDB13C","#FFD36E"];
 const ALL_TIES = ["0", "1", "2", "3", "4", "5"];
 const ORG_COLOR = "#2DD4BF";
+const AGENT_COLOR = "#C084FC";
+const EDGE_KIND_COLOR = {
+  friend: "#5B9BF2", family: "#F2739A", partner: "#D66BE0", colleague: "#8C7CF0",
+  classmate: "#F2C94C", knows: "#9AA7BD", sibling: "#F2916B", neighbour: "#6FCF7A",
+  mentor_of: "#A67C52", manager_of: "#C0524A", introduced: "#B8C24F",
+};
+const COPY_ICON = '<svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
+const SYNC_LABELS = {
+  sync_backup: "Backup",
+  sync_linkedin: "LinkedIn sync",
+  sync_interactions_whatsapp: "WhatsApp interactions",
+  sync_interactions_email: "Email interactions",
+};
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
@@ -502,6 +561,10 @@ function ago(days) {
   if (days < 365) return Math.round(days / 30.4) + "m";
   const y = days / 365;
   return (y < 10 ? y.toFixed(1) : Math.round(y)) + "a";
+}
+function fmtSyncWhen(ms) {
+  if (!ms) return "";
+  return new Date(ms).toLocaleString(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 // ── toasts ─────────────────────────────────────────────────
@@ -586,7 +649,7 @@ async function fetchAll(build) {
 async function load() {
   const [people, orgs, edges, affs, idents, facts, inter] = await Promise.all([
     fetchAll(() => sb.from("person").select("*").order("full_name")),
-    fetchAll(() => sb.from("orgs").select("id,name").order("name")),
+    fetchAll(() => sb.from("orgs").select("id,name,kind,domain,city,country,note,parent_org_id").order("name")),
     fetchAll(() => sb.from("edges").select("a_id,b_id,kind,strength").order("a_id")),
     fetchAll(() => sb.from("affiliations").select("person_id,org_id,role,since,until").order("person_id")),
     fetchAll(() => sb.from("identifiers").select("person_id,kind,value").order("person_id")),
@@ -604,7 +667,7 @@ async function load() {
   affs.data.forEach(a => { a.org_name = orgName.get(a.org_id); push(affsBy, a.person_id, a); });
 
   DATA.people = people.data.map(p => ({
-    id: p.id, name: p.full_name, org: p.current_org, role: p.current_role, city: p.city,
+    id: p.id, name: p.full_name, kind: p.kind || "human", org: p.current_org, role: p.current_role, city: p.city,
     country: p.country, tie: p.tie_strength, age: p.age, birthdate: p.birthdate,
     birthdayMd: p.birthday_md, metWhere: p.met_where, metWhen: p.met_when,
     linkedinUrl: p.linkedin_url, summary: p.summary,
@@ -639,11 +702,129 @@ function renderStats() {
   ].map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join("");
 }
 
+// ── sync status (recurring daemon mechanisms: backup, LinkedIn, WhatsApp/email interactions) ──
+// These run outside this app (in the daemon) and persist their own state elsewhere; the only
+// trace visible here is the summary JSON each one best-effort writes to app_settings.
+async function loadSyncStatus() {
+  const list = $("statusList");
+  const keys = Object.keys(SYNC_LABELS);
+  const { data, error } = await sb.from("app_settings").select("key,value").in("key", keys);
+  if (error) { list.innerHTML = `<div class="none" style="color:var(--red)">${esc(error.message)}</div>`; return; }
+  const byKey = new Map((data || []).map(r => [r.key, r.value]));
+  list.innerHTML = keys.map(key => {
+    const label = SYNC_LABELS[key];
+    const raw = byKey.get(key);
+    let state = null;
+    if (raw != null) { try { state = JSON.parse(raw); } catch { state = null; } }
+    if (!state) {
+      return `<div class="sync-row">
+        <div class="sy-main"><div class="sy-name">${esc(label)}</div><div class="sy-when">never run yet</div></div>
+        <span class="chip" style="color:var(--muted)">—</span>
+      </div>`;
+    }
+    const color = state.ok ? "var(--ok)" : "var(--red)";
+    return `<div class="sync-row" title="${esc(state.detail || "")}">
+      <div class="sy-main"><div class="sy-name">${esc(label)}</div><div class="sy-when">${esc(fmtSyncWhen(state.lastRunMs))}</div></div>
+      <span class="chip" style="color:${color};border-color:${color}">${state.ok ? "✓ ok" : "✗ error"}</span>
+    </div>`;
+  }).join("");
+}
+
+// ── insights (unexpected bridges + super connectors) ──────────
+// Ported from a sibling project (whatsapp-social-graph): Jaccard similarity
+// between two organizations' member sets finds people who bridge otherwise
+// disjoint circles — an intro path the directory alone doesn't surface.
+// Pure over already-loaded DATA, so it's cheap enough to recompute on every open.
+function computeInsights() {
+  const orgMembers = new Map(); // org_id -> Set<person_id>
+  const affsByPerson = new Map(); // person_id -> [org_id]
+  DATA.affs.forEach(a => {
+    if (!orgMembers.has(a.org_id)) orgMembers.set(a.org_id, new Set());
+    orgMembers.get(a.org_id).add(a.person_id);
+    if (!affsByPerson.has(a.person_id)) affsByPerson.set(a.person_id, []);
+    affsByPerson.get(a.person_id).push(a.org_id);
+  });
+
+  const jaccardCache = new Map();
+  const jaccard = (o1, o2) => {
+    const key = o1 < o2 ? `${o1}|${o2}` : `${o2}|${o1}`;
+    if (jaccardCache.has(key)) return jaccardCache.get(key);
+    const s1 = orgMembers.get(o1), s2 = orgMembers.get(o2);
+    let v = 0;
+    if (s1 && s2 && s1.size && s2.size) {
+      let inter = 0;
+      const [small, large] = s1.size < s2.size ? [s1, s2] : [s2, s1];
+      for (const id of small) if (large.has(id)) inter++;
+      const union = s1.size + s2.size - inter;
+      v = union ? inter / union : 0;
+    }
+    jaccardCache.set(key, v);
+    return v;
+  };
+
+  const orgName = id => DATA.orgs.find(o => o.id === id)?.name || "?";
+  const bridges = [];
+  affsByPerson.forEach((orgIds, personId) => {
+    if (orgIds.length < 2) return;
+    const p = byId.get(personId);
+    if (!p) return;
+    let maxDisconnect = 0, bestPair = null;
+    for (let i = 0; i < orgIds.length; i++) {
+      for (let j = i + 1; j < orgIds.length; j++) {
+        const disconnect = 1 - jaccard(orgIds[i], orgIds[j]);
+        if (disconnect > maxDisconnect) { maxDisconnect = disconnect; bestPair = [orgIds[i], orgIds[j]]; }
+      }
+    }
+    // Only genuinely disjoint pairs — otherwise every co-worker at a two-person org "bridges" it.
+    if (bestPair && maxDisconnect > 0.4) {
+      bridges.push({ id: personId, name: p.name, score: maxDisconnect, orgA: orgName(bestPair[0]), orgB: orgName(bestPair[1]) });
+    }
+  });
+  bridges.sort((a, b) => b.score - a.score);
+
+  // Super connectors: distinct people reached via direct edges + organizations joined.
+  const linkedPeople = new Map(); // person_id -> Set<person_id>
+  DATA.edges.forEach(e => {
+    if (!linkedPeople.has(e.a)) linkedPeople.set(e.a, new Set());
+    if (!linkedPeople.has(e.b)) linkedPeople.set(e.b, new Set());
+    linkedPeople.get(e.a).add(e.b);
+    linkedPeople.get(e.b).add(e.a);
+  });
+  const connectors = DATA.people
+    .map(p => ({ id: p.id, name: p.name, total: (affsByPerson.get(p.id) || []).length + (linkedPeople.get(p.id)?.size || 0) }))
+    .filter(c => c.total >= 3)
+    .sort((a, b) => b.total - a.total);
+
+  return { bridges: bridges.slice(0, 15), connectors: connectors.slice(0, 10) };
+}
+
+function renderInsights() {
+  const { bridges, connectors } = computeInsights();
+  const goto = id => { $("insightsPop").classList.remove("open"); select(id); };
+  const rowsB = bridges.length
+    ? bridges.map(b => `<div class="row-item">
+        <a class="lbl" data-goto="${b.id}">${esc(b.name)}<span class="k">${esc(b.orgA)} ↔ ${esc(b.orgB)}</span></a>
+      </div>`).join("")
+    : `<div class="none">none yet — needs people affiliated with 2+ disjoint organizations</div>`;
+  const rowsC = connectors.length
+    ? connectors.map(c => `<div class="row-item">
+        <a class="lbl" data-goto="${c.id}">${esc(c.name)}</a>
+        <span class="k">${c.total}</span>
+      </div>`).join("")
+    : `<div class="none">no super connectors yet</div>`;
+  $("insightsList").innerHTML = `
+    <div class="grp"><h4>Unexpected bridges</h4>${rowsB}</div>
+    <div class="grp"><h4>Super connectors</h4>${rowsC}</div>
+  `;
+  $("insightsList").querySelectorAll("[data-goto]").forEach(a => a.onclick = () => goto(Number(a.dataset.goto)));
+}
+
 // ── graph model ───────────────────────────────────────────
 let nodes = [], links = [], idx = new Map(), degree = [];
-let showIsolated = false, showOrgs = true, showLabels = true;
+let showIsolated = false, showOrgs = true, showLabels = true, colorByKind = false, showAgents = true;
 let orgFilter = "", tieFilter = new Set(ALL_TIES);
 let selected = null;
+let selectedOrgId = null;
 // people with no link at all are not on the graph by default; opening one from the
 // The directory pins a selection so it can appear alone without showing every isolated person.
 const pinned = new Set();
@@ -663,7 +844,12 @@ function buildGraph() {
     }, o));
     return i;
   };
-  const addP = id => { const p = byId.get(id); return p ? add("p" + id, { type: "person", id, label: p.name, ref: p }) : -1; };
+  const addP = id => {
+    const p = byId.get(id);
+    if (!p) return -1;
+    if (p.kind === "agent" && !showAgents) return -1;
+    return add("p" + id, { type: "person", id, label: p.name, ref: p });
+  };
   const addO = id => {
     const o = DATA.orgs.find(x => x.id === id);
     return o ? add("o" + id, { type: "org", id, label: o.name, ref: o }) : -1;
@@ -889,7 +1075,9 @@ function draw() {
         ctx.strokeStyle = g; ctx.lineWidth = 1.7 / cam.k;
       } else {
         ctx.strokeStyle = d ? "rgba(120,128,145,.06)"
-          : l.kind === "org" ? "rgba(45,212,191,.16)" : "rgba(150,158,175,.24)";
+          : l.kind === "org" ? "rgba(45,212,191,.16)"
+          : (colorByKind && EDGE_KIND_COLOR[l.kind]) ? EDGE_KIND_COLOR[l.kind] + "3D"
+          : "rgba(150,158,175,.24)";
         ctx.lineWidth = 1 / cam.k;
       }
       ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
@@ -902,7 +1090,8 @@ function draw() {
     const d = dim[i] && !isSel;
     const faded = focus >= 0 && !near.has(i);
     ctx.globalAlpha = d ? .1 : faded ? .38 : 1;
-    const col = n.type === "org" ? ORG_COLOR : tieColor(n.ref.tie);
+    const isAgent = n.type === "person" && n.ref.kind === "agent";
+    const col = n.type === "org" ? ORG_COLOR : isAgent ? AGENT_COLOR : tieColor(n.ref.tie);
     if (isSel || isHov) {
       ctx.globalAlpha = d ? .35 : 1;
       ctx.beginPath(); ctx.arc(n.x, n.y, n.r + 9 / cam.k, 0, 7);
@@ -912,6 +1101,16 @@ function draw() {
     if (n.type === "org") {
       ctx.save(); ctx.translate(n.x, n.y); ctx.rotate(Math.PI / 4);
       const s = n.r * .82; ctx.fillRect(-s, -s, s * 2, s * 2); ctx.restore();
+    } else if (isAgent) {
+      // hexagon — visually distinct from both the person circle and the org diamond,
+      // an agent isn't "closer/further" the way tie_strength implies for a human.
+      ctx.beginPath();
+      for (let k = 0; k < 6; k++) {
+        const ang = Math.PI / 3 * k - Math.PI / 2;
+        const px = n.x + n.r * Math.cos(ang), py = n.y + n.r * Math.sin(ang);
+        if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath(); ctx.fill();
     } else {
       ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 7); ctx.fill();
     }
@@ -1032,6 +1231,7 @@ function wireCanvas() {
       orgFilter = nodes[i].label; renderFilters(); renderActiveFilters();
       egoSet = new Set([i]); neigh[i].forEach(([j]) => egoSet.add(j));
       fitTo([...egoSet].map(j => nodes[j]), 90); invalidate();
+      selectOrg(nodes[i].ref.id, false);
     }
     else if (wasPan) { closeDrawer(); egoSet = null; orgFilter = ""; renderFilters(); renderActiveFilters(); invalidate(); }
   });
@@ -1064,7 +1264,7 @@ function moveTooltip(x, y) {
 let creating = false;
 
 function select(id, zoom = true) {
-  selected = id; creating = false;
+  selected = id; selectedOrgId = null; creating = false;
   if (!idx.has("p" + id)) { pinned.add(id); buildGraph(); prewarm(220, 90); reheat(.22); }
   const i = idx.get("p" + id);
   invalidate();
@@ -1078,7 +1278,109 @@ function select(id, zoom = true) {
 function openDrawer() { $("drawer").classList.add("open"); document.body.classList.add("drawer-open"); invalidate(); }
 function closeDrawer() {
   $("drawer").classList.remove("open"); document.body.classList.remove("drawer-open");
-  selected = null; creating = false; invalidate();
+  selected = null; selectedOrgId = null; creating = false; invalidate();
+}
+
+function selectOrg(id, zoom = true) {
+  const org = DATA.orgs.find(o => o.id === id);
+  if (!org) return;
+  selectedOrgId = id; selected = null; creating = false;
+  invalidate();
+  renderOrgDrawer(org);
+  openDrawer();
+  const i = idx.get("o" + id);
+  if (zoom && i !== undefined) {
+    const list = [nodes[i], ...neigh[i].map(([j]) => nodes[j])];
+    fitTo(list, list.length > 1 ? 130 : 300);
+  }
+}
+
+function renderOrgDrawer(o) {
+  const d = $("drawer");
+  const v = k => esc(o[k] != null ? o[k] : "");
+  const people = DATA.affs
+    .filter(a => a.org_id === o.id)
+    .map(a => ({ ...a, person: byId.get(a.person_id) }))
+    .filter(a => a.person)
+    .sort((a, b) => a.person.name.localeCompare(b.person.name));
+  const parentOrg = o.parent_org_id ? DATA.orgs.find(x => x.id === o.parent_org_id) : null;
+  const subOrgs = DATA.orgs.filter(x => x.parent_org_id === o.id).sort((a, b) => a.name.localeCompare(b.name));
+
+  d.innerHTML = `
+    <div class="dr-head">
+      <div class="mono-avatar" style="color:${ORG_COLOR};border-color:${ORG_COLOR}44">${esc(initials(o.name))}</div>
+      <div class="dr-id">
+        <h2 id="drName">${esc(o.name)}</h2>
+        <div class="sub"><span class="chip">organization</span></div>
+      </div>
+      <button class="btn btn-ghost btn-icon" id="closeDr" title="Close (esc)">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="dr-body">
+      <section class="blk"><h3>Record <em id="orgSaveHint" class="hint">autosave</em></h3>
+        <div class="fld"><label class="fl">Name</label><input id="o_name" value="${v("name")}"></div>
+        <div class="grid2">
+          <div class="fld"><label class="fl">Kind</label><input id="o_kind" placeholder="company, school, nonprofit…" value="${v("kind")}"></div>
+          <div class="fld"><label class="fl">Domain</label><input id="o_domain" placeholder="acme.com" value="${v("domain")}"></div>
+        </div>
+        <div class="grid2">
+          <div class="fld"><label class="fl">City</label><input id="o_city" value="${v("city")}"></div>
+          <div class="fld"><label class="fl">Country</label><input id="o_country" value="${v("country")}"></div>
+        </div>
+        <div class="fld"><label class="fl">Note</label><textarea id="o_note">${v("note")}</textarea></div>
+        <div class="fld"><label class="fl">Parent organization</label>
+          <input id="o_parent" list="orgs-dl" placeholder="none" value="${esc(parentOrg ? parentOrg.name : "")}"></div>
+      </section>
+
+      <section class="blk"><h3>Sub-organizations <em>${subOrgs.length}</em></h3>
+        ${subOrgs.length ? subOrgs.map(x => `<div class="row-item">
+            <a class="lbl" data-goto-suborg="${x.id}">${esc(x.name)}</a>
+          </div>`).join("")
+          : `<div class="none">none</div>`}
+      </section>
+
+      <section class="blk"><h3>People <em>${people.length}</em></h3>
+        ${people.length ? people.map(a => `<div class="row-item">
+            <a class="lbl" data-goto="${a.person.id}">${esc(a.person.name)}${a.role ? ` <span class="k">${esc(a.role)}</span>` : ""}</a>
+          </div>`).join("")
+          : `<div class="none">no one recorded here yet</div>`}
+      </section>
+    </div>`;
+
+  $("closeDr").onclick = closeDrawer;
+  d.querySelectorAll("[data-goto]").forEach(a => a.onclick = () => select(Number(a.dataset.goto)));
+  d.querySelectorAll("[data-goto-suborg]").forEach(a => a.onclick = () => selectOrg(Number(a.dataset.gotoSuborg)));
+
+  const ORG_FIELDS = { o_name: "name", o_kind: "kind", o_domain: "domain", o_city: "city", o_country: "country", o_note: "note" };
+  const hint = (txt, kind) => { const h = $("orgSaveHint"); if (!h) return; h.textContent = txt; h.className = "hint" + (kind ? " " + kind : ""); };
+  for (const [id, col] of Object.entries(ORG_FIELDS)) {
+    $(id).onchange = async () => {
+      const val = $(id).value.trim() || null;
+      if (val === (o[col] ?? null)) return;
+      hint("…");
+      const r = await sb.from("orgs").update({ [col]: val }).eq("id", o.id);
+      if (r.error) { $(id).value = o[col] ?? ""; hint(r.error.message, "err"); toast(r.error.message, "err"); return; }
+      o[col] = val;
+      if (id === "o_name") { $("drName").textContent = val || "—"; renderFilters(); }
+      hint("saved"); setTimeout(() => hint("autosave"), 1600);
+    };
+  }
+  $("o_parent").onchange = async () => {
+    const name = $("o_parent").value.trim();
+    let newParentId = null;
+    if (name) {
+      const match = DATA.orgs.find(x => x.name.toLowerCase() === name.toLowerCase());
+      if (!match) { $("o_parent").value = parentOrg ? parentOrg.name : ""; hint("organization not found", "err"); toast("Organization not found. Choose an exact name from the list.", "err"); return; }
+      if (match.id === o.id) { $("o_parent").value = parentOrg ? parentOrg.name : ""; hint("can't be its own parent", "err"); toast("An organization can't be its own parent.", "err"); return; }
+      newParentId = match.id;
+    }
+    if (newParentId === (o.parent_org_id ?? null)) return;
+    hint("…");
+    const r = await sb.from("orgs").update({ parent_org_id: newParentId }).eq("id", o.id);
+    if (r.error) { $("o_parent").value = parentOrg ? parentOrg.name : ""; hint(r.error.message, "err"); toast(r.error.message, "err"); return; }
+    o.parent_org_id = newParentId;
+    hint("saved"); setTimeout(() => hint("autosave"), 1600);
+  };
 }
 
 function renderDrawer(p) {
@@ -1097,7 +1399,7 @@ function renderDrawer(p) {
 
   d.innerHTML = `
     <div class="dr-head">
-      <div class="mono-avatar" id="drAvatar" style="color:${tieColor(p.tie)};border-color:${tieColor(p.tie)}44">${esc(initials(p.name))}</div>
+      <div class="mono-avatar" id="drAvatar" style="color:${p.kind === "agent" ? AGENT_COLOR : tieColor(p.tie)};border-color:${p.kind === "agent" ? AGENT_COLOR : tieColor(p.tie)}44">${esc(initials(p.name))}</div>
       <div class="dr-id">
         <h2 id="drName">${esc(p.name)}</h2>
         <div class="sub" id="drSub">${headChips(p)}</div>
@@ -1108,6 +1410,7 @@ function renderDrawer(p) {
     <div class="dr-body">
       <section class="blk"><h3>Record <em id="saveHint" class="hint">autosave</em></h3>
         <div class="fld"><label class="fl">Full name</label><input id="f_name" value="${v("name")}"></div>
+        ${p.kind === "agent" ? "" : `
         <div class="grid2">
           <div class="fld"><label class="fl">City</label><input id="f_city" value="${v("city")}"></div>
           <div class="fld"><label class="fl">Country</label><input id="f_country" value="${v("country")}"></div>
@@ -1121,7 +1424,7 @@ function renderDrawer(p) {
           <div class="fld"><label class="fl">Birth date${p.age != null ? ` <em class="fl-hint">${p.age} years old</em>` : ""}</label>
             <input type="date" id="f_bd" value="${v("birthdate")}"></div>
           <div class="fld"><label class="fl">MM-DD if year is unknown</label><input id="f_bmd" value="${v("birthdayMd")}"></div>
-        </div>
+        </div>`}
         <div class="grid2">
           <div class="fld"><label class="fl">Where you met</label><input id="f_mw" value="${v("metWhere")}"></div>
           <div class="fld"><label class="fl">When</label><input id="f_mn" value="${v("metWhen")}"></div>
@@ -1147,7 +1450,7 @@ function renderDrawer(p) {
 
       <section class="blk"><h3>Organizations <em>${p.affiliations.length}</em></h3>
         ${p.affiliations.length ? p.affiliations.map(a => `<div class="row-item">
-            <span class="lbl">${esc(a.org_name)}${a.role ? ` <span class="k">${esc(a.role)}</span>` : ""}</span>
+            <a class="lbl" data-goto-org="${a.org_id}">${esc(a.org_name)}${a.role ? ` <span class="k">${esc(a.role)}</span>` : ""}</a>
             <span class="x" data-da="${a.org_id}|${esc(a.role || "")}">✕</span></div>`).join("")
           : `<div class="none">none</div>`}
         <div class="add">
@@ -1174,6 +1477,7 @@ function renderDrawer(p) {
       <section class="blk"><h3>Identifiers <em>${p.identifiers.length}</em></h3>
         ${p.identifiers.length ? p.identifiers.map(x => `<div class="row-item">
             <span class="lbl"><span class="k">${esc(x.kind)}</span> ${esc(x.value)}</span>
+            <button type="button" class="copy-btn" data-copy="${esc(x.value)}" title="Copy value">${COPY_ICON}</button>
             <span class="x" data-di="${esc(x.kind)}|${esc(x.value)}">✕</span></div>`).join("")
           : `<div class="none">none</div>`}
         <div class="add">
@@ -1188,6 +1492,7 @@ function renderDrawer(p) {
       <section class="blk"><h3>Facts <em>${p.facts.length}</em></h3>
         ${p.facts.length ? p.facts.map(f => `<div class="row-item">
             <span class="lbl"><span class="k">${esc(f.key)}</span> ${esc(f.value ?? f.num ?? f.date ?? "")}</span>
+            <button type="button" class="copy-btn" data-copy="${esc(f.value ?? f.num ?? f.date ?? "")}" title="Copy value">${COPY_ICON}</button>
             <span class="x" data-df="${f.id}">✕</span></div>`).join("")
           : `<div class="none">none</div>`}
         <div class="add">
@@ -1210,6 +1515,11 @@ function renderDrawer(p) {
   $("closeDr").onclick = closeDrawer;
   wireInlineFields(p);
   d.querySelectorAll("[data-goto]").forEach(a => a.onclick = () => select(Number(a.dataset.goto)));
+  d.querySelectorAll("[data-goto-org]").forEach(a => a.onclick = () => selectOrg(Number(a.dataset.gotoOrg)));
+  d.querySelectorAll("[data-copy]").forEach(btn => btn.onclick = async () => {
+    try { await navigator.clipboard.writeText(btn.dataset.copy); toast("copied"); }
+    catch { toast("copy failed — select the text manually", "err"); }
+  });
 
   // Delete only this person. Cascades remove their links, identifiers,
   // affiliations, facts, and interactions. Other people remain untouched.
@@ -1307,6 +1617,11 @@ const FIELDS = {
 };
 
 function headChips(p) {
+  if (p.kind === "agent") {
+    return `<span class="chip" style="color:${AGENT_COLOR};border-color:${AGENT_COLOR}66">
+        <span class="dot" style="background:${AGENT_COLOR}"></span>Agent</span>
+      ${p.lastContact ? `<span class="chip">seen ${ago(p.days)}</span>` : ""}`;
+  }
   return `<span class="chip" style="color:${tieColor(p.tie)};border-color:${tieColor(p.tie)}66">
       <span class="dot" style="background:${tieColor(p.tie)}"></span>${esc(tieLabel(p.tie))}</span>
     ${p.lastContact ? `<span class="chip">seen ${ago(p.days)}</span>` : ""}`;
@@ -1567,19 +1882,57 @@ function wire() {
   $("filterBtn").onclick = e => { e.stopPropagation(); placePop(); pop.classList.toggle("open"); };
   document.addEventListener("click", e => {
     if (!pop.contains(e.target) && e.target !== $("filterBtn")) pop.classList.remove("open");
+    if (!statusPop.contains(e.target) && e.target !== $("statusBtn")) statusPop.classList.remove("open");
+    if (!insightsPop.contains(e.target) && e.target !== $("insightsBtn")) insightsPop.classList.remove("open");
   });
   $("orgFilter").onchange = () => { orgFilter = $("orgFilter").value; renderActiveFilters(); invalidate(); };
   $("showIsolated").onchange = e => { showIsolated = e.target.checked; buildGraph(); reheat(.5); };
   $("showOrgs").onchange = e => { showOrgs = e.target.checked; buildGraph(); reheat(.5); };
   $("showLabels").onchange = e => { showLabels = e.target.checked; invalidate(); };
+  $("colorByKind").onchange = e => {
+    colorByKind = e.target.checked;
+    $("kindLegend").classList.toggle("show", colorByKind);
+    invalidate();
+  };
+  $("showAgents").onchange = e => { showAgents = e.target.checked; buildGraph(); reheat(.5); };
   $("resetBtn").onclick = () => {
     orgFilter = ""; tieFilter = new Set(ALL_TIES); egoSet = null;
-    showIsolated = false; showOrgs = showLabels = true;
+    showIsolated = false; showOrgs = showLabels = showAgents = true; colorByKind = false;
     $("showIsolated").checked = false;
-    $("showOrgs").checked = $("showLabels").checked = true;
+    $("showOrgs").checked = $("showLabels").checked = $("showAgents").checked = true;
+    $("colorByKind").checked = false;
+    $("kindLegend").classList.remove("show");
     buildGraph(); renderFilters(); renderActiveFilters(); reheat(.5); fitView();
     pop.classList.remove("open");
   };
+
+  const statusPop = $("statusPop");
+  const placeStatusPop = () => {
+    const r = $("statusBtn").getBoundingClientRect();
+    statusPop.style.left = Math.max(10, Math.min(r.right - 290, innerWidth - 300)) + "px";
+  };
+  $("statusBtn").onclick = e => {
+    e.stopPropagation(); placeStatusPop();
+    const opening = !statusPop.classList.contains("open");
+    statusPop.classList.toggle("open");
+    if (opening) loadSyncStatus();
+  };
+
+  const insightsPop = $("insightsPop");
+  const placeInsightsPop = () => {
+    const r = $("insightsBtn").getBoundingClientRect();
+    insightsPop.style.left = Math.max(10, Math.min(r.right - 290, innerWidth - 300)) + "px";
+  };
+  $("insightsBtn").onclick = e => {
+    e.stopPropagation(); placeInsightsPop();
+    const opening = !insightsPop.classList.contains("open");
+    insightsPop.classList.toggle("open");
+    if (opening) renderInsights();
+  };
+
+  $("kindLegend").innerHTML = EDGE_KINDS.map(k =>
+    `<span class="kl"><i style="background:${EDGE_KIND_COLOR[k]}"></i>${esc(k.replace(/_/g, " "))}</span>`
+  ).join("");
 
   addEventListener("keydown", e => {
     const mod = e.metaKey || e.ctrlKey;
@@ -1597,7 +1950,7 @@ function wire() {
     }
     if (typing) return;
 
-    if (e.key === "Escape") { pop.classList.remove("open"); if (egoSet) { egoSet = null; renderActiveFilters(); invalidate(); } else closeDrawer(); }
+    if (e.key === "Escape") { pop.classList.remove("open"); statusPop.classList.remove("open"); insightsPop.classList.remove("open"); if (egoSet) { egoSet = null; renderActiveFilters(); invalidate(); } else closeDrawer(); }
     else if (e.key === "/" ) { e.preventDefault(); openPalette(); }
     else if (e.key === "f" || e.key === "F") { egoSet = null; renderActiveFilters(); fitView(); }
     else if (e.key === "e" && selected != null) { e.preventDefault(); $("f_name")?.focus(); }
