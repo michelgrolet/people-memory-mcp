@@ -137,10 +137,10 @@ class GraphRepository:
         ]
         if len(exact) == 1:
             return {"status": "resolved", "person": exact[0]}
-        if len(candidates) == 1:
-            return {"status": "resolved", "person": candidates[0]}
         if not candidates:
             return {"status": "not_found", "query": name}
+        # A single fuzzy (non-exact) candidate is still a guess, not a resolution:
+        # it must go through needs_confirmation just like remember_person does.
         return {"status": "needs_confirmation", "query": name, "candidates": candidates}
 
     def get_person(self, person_id: int) -> dict[str, Any] | None:
