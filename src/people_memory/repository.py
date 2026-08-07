@@ -351,7 +351,11 @@ class GraphRepository:
                     """
                     insert into facts (person_id, key, value, source, confidence)
                     values (%s, %s, %s, %s, 'stated')
-                    on conflict (person_id, key, value) where value is not null do nothing
+                    on conflict (
+                        person_id, key, value,
+                        coalesce(date, '-infinity'::date),
+                        coalesce(num, 'NaN'::double precision)
+                    ) where value is not null do nothing
                     """,
                     (person_id, fact_key, fact_value, source),
                 )
@@ -433,15 +437,24 @@ class GraphRepository:
             """
             insert into facts (person_id, key, value, num, date, source, confidence)
             values (%s, %s, %s, %s, %s, %s, %s)
-            on conflict (person_id, key, value) where value is not null do nothing
+            on conflict (
+                person_id, key, value,
+                coalesce(date, '-infinity'::date),
+                coalesce(num, 'NaN'::double precision)
+            ) where value is not null do nothing
             returning *
             """,
             (person_id, key, value, num, fact_date, source, confidence),
         )
         if row is None and value is not None:
             row = self.db.fetch_one(
-                "select * from facts where person_id = %s and key = %s and value = %s",
-                (person_id, key, value),
+                """
+                select * from facts
+                where person_id = %s and key = %s and value = %s
+                  and date is not distinct from %s
+                  and num is not distinct from %s
+                """,
+                (person_id, key, value, fact_date, num),
             )
         return row or {}
 
