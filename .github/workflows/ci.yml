@@ -28,7 +28,20 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --extra api --extra dev --locked
-      - name: Apply core schema
-        run: psql "$PEOPLE_MEMORY_TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20260803000000_core.sql
+      - name: Stub Supabase auth (roles/schema the migrations expect)
+        run: |
+          psql "$PEOPLE_MEMORY_TEST_DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          create role anon nologin noinherit;
+          create role authenticated nologin noinherit;
+          create schema if not exists auth;
+          create or replace function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$;
+          SQL
+      - name: Apply migrations
+        run: |
+          set -e
+          for f in supabase/migrations/*.sql; do
+            echo "Applying $f"
+            psql "$PEOPLE_MEMORY_TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+          done
       - run: uv run ruff check .
       - run: uv run pytest --cov=people_memory --cov-report=term-missing
