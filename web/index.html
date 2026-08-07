@@ -6,6 +6,12 @@
 <meta name="theme-color" content="#0A0B0D">
 <title>People Memory</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="People">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
@@ -249,7 +255,7 @@
     font-size:13px;background:var(--bg2);border:1px solid var(--line);
   }
   .row-item+.row-item{margin-top:5px}
-  .row-item .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row-item .lbl{flex:1;min-width:0;word-break:break-word}
   .row-item .lbl .k{color:var(--muted);font-size:11.5px;font-family:var(--mono)}
   .row-item a.lbl{color:var(--txt);text-decoration:none;cursor:pointer}
   .row-item a.lbl:hover{color:var(--accent2)}
@@ -337,6 +343,36 @@
     #palette{top:0;left:0;transform:none;width:100%;border-radius:0;height:100%;display:flex;flex-direction:column}
     #palette.open{transform:none}
     .pal-list{max-height:none;flex:1}
+
+    /* ── top bar: fit small screens without wrapping/clipping ── */
+    #top{padding:0 10px;gap:7px}
+    .brand{gap:6px;font-size:14px}
+    .brand-txt{display:none}
+    #searchTrigger{min-width:44px;min-height:44px;justify-content:center;padding:7px}
+    #kbdHint{display:none}
+    .btn-txt{display:none}
+    #filterBtn,#newBtn{padding:7px;justify-content:center;min-width:44px}
+
+    /* ── touch targets: ≥44px for standalone controls ── */
+    .btn{min-height:44px}
+    .btn-icon{width:44px;height:44px}
+    .btn-sm{min-height:44px;padding:8px 10px}
+    #zoomctl .btn{width:44px;height:44px}
+    .row-item{min-height:44px}
+    .row-item .x{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;font-size:16px}
+    .ia{padding:10px 0;align-items:center}
+    .ia .x{width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center}
+    #activeFilters .chip button{padding:8px}
+
+    /* ── forms: one column, stacked inputs are easier to tap ── */
+    .grid2{grid-template-columns:1fr}
+    .add{flex-wrap:wrap}
+    .add>input,.add>select{flex:1 1 100%}
+    .add>.btn{flex:1 1 100%;justify-content:center}
+    .dr-foot{flex-wrap:wrap}
+    .dr-foot>.btn{flex:1 1 auto;justify-content:center}
+
+    .pop{width:min(290px,calc(100vw - 20px))}
   }
   @media (prefers-reduced-motion:reduce){
     *{animation-duration:.01ms!important;transition-duration:.01ms!important}
@@ -1075,11 +1111,39 @@ function select(id, zoom = true) {
     fitTo(list, list.length > 1 ? 130 : 300);
   }
 }
-function openDrawer() { $("drawer").classList.add("open"); document.body.classList.add("drawer-open"); invalidate(); }
+function openDrawer() { $("drawer").classList.add("open"); document.body.classList.add("drawer-open"); invalidate(); ensureOverlayHistoryState(); }
 function closeDrawer() {
   $("drawer").classList.remove("open"); document.body.classList.remove("drawer-open");
   selected = null; creating = false; invalidate();
+  releaseOverlayHistoryStateIfIdle();
 }
+
+// ── mobile back/swipe should close the palette or drawer, not exit the PWA ──
+// (neither overlay pushes a history entry per keystroke/rerender — only on open — and a
+// palette→drawer transition, e.g. picking a result, reuses the same entry instead of
+// popping+pushing, since a synchronous history.back() followed by pushState() races.)
+let overlayStatePushed = false, suppressNextPopstate = false;
+function anyOverlayOpen() { return palOpen || $("drawer").classList.contains("open"); }
+function ensureOverlayHistoryState() {
+  if (!overlayStatePushed) { history.pushState({ ppOverlay: true }, "", location.href); overlayStatePushed = true; }
+}
+function releaseOverlayHistoryStateIfIdle() {
+  // deferred to a microtask: a palette→drawer transition (pick()) closes one and opens the
+  // other synchronously, so we must check "is anything still open" only after that settles.
+  queueMicrotask(() => {
+    if (overlayStatePushed && !anyOverlayOpen()) {
+      suppressNextPopstate = true;
+      overlayStatePushed = false;
+      history.back();
+    }
+  });
+}
+window.addEventListener("popstate", () => {
+  if (suppressNextPopstate) { suppressNextPopstate = false; return; }
+  overlayStatePushed = false;
+  if (palOpen) closePalette();
+  if ($("drawer").classList.contains("open")) closeDrawer();
+});
 
 function renderDrawer(p) {
   const d = $("drawer");
@@ -1436,10 +1500,12 @@ function openPalette(seed) {
   $("scrim").classList.add("open"); $("palette").classList.add("open");
   $("palQ").value = seed || ""; renderPalette();
   requestAnimationFrame(() => { $("palQ").focus(); $("palQ").select(); });
+  ensureOverlayHistoryState();
 }
 function closePalette() {
   palOpen = false;
   $("scrim").classList.remove("open"); $("palette").classList.remove("open");
+  releaseOverlayHistoryStateIfIdle();
 }
 function score(p, q) {
   if (!q) return 1;
@@ -1603,6 +1669,11 @@ function wire() {
     else if (e.key === "e" && selected != null) { e.preventDefault(); $("f_name")?.focus(); }
   });
 }
+</script>
+<script>
+  if ("serviceWorker" in navigator) {
+    addEventListener("load", () => navigator.serviceWorker.register("./sw.js").catch(() => {}));
+  }
 </script>
 </body>
 </html>
