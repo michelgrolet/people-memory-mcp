@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import json
+import os
 import secrets
 import shutil
 import subprocess
@@ -11,7 +12,12 @@ from pathlib import Path
 
 from .config import DEFAULT_ENV_PATH, Settings
 from .db import Database
-from .importers import parse_google_csv, parse_linkedin_csv, parse_whatsapp_export
+from .importers import (
+    fetch_linkedin_connections,
+    parse_google_csv,
+    parse_linkedin_csv,
+    parse_whatsapp_export,
+)
 from .repository import GraphRepository
 
 REPOSITORY_URL = "git+https://github.com/michelgrolet/people-memory-mcp"
@@ -139,41 +145,27 @@ def _import_record(repo: GraphRepository, record, accept_similar_as_new: bool = 
     return result
 
 
-def cmd_import(args: argparse.Namespace) -> None:
-    path = Path(args.path).expanduser()
-    if args.source == "linkedin":
-        records = parse_linkedin_csv(path)
-        interactions = {}
-    elif args.source == "google":
-        records = parse_google_csv(path)
-        interactions = {}
-    else:
-        if not args.self_name:
-            raise SystemExit("--self-name is required for WhatsApp exports")
-        try:
-            records, interactions = parse_whatsapp_export(path, args.self_name, args.date_order)
-        except ValueError as exc:
-            raise SystemExit(str(exc)) from exc
+def _preview(records) -> dict:
+    sample = [
+        {
+            "full_name": record.full_name,
+            "has_email": bool(record.emails),
+            "has_phone": bool(record.phones),
+            "organization": record.organization,
+            "source": record.source,
+        }
+        for record in records[:5]
+    ]
+    return {"records": len(records), "sample": sample}
 
-    if args.dry_run:
-        sample = [
-            {
-                "full_name": record.full_name,
-                "has_email": bool(record.emails),
-                "has_phone": bool(record.phones),
-                "organization": record.organization,
-                "source": record.source,
-            }
-            for record in records[:5]
-        ]
-        print(json.dumps({"records": len(records), "sample": sample}, indent=2))
-        return
 
-    repo = _repo()
+def _apply_import(
+    repo: GraphRepository, records, interactions: dict, accept_similar_as_new: bool
+) -> dict:
     stats = {"created": 0, "updated": 0, "needs_confirmation": 0}
     unresolved = []
     for record in records:
-        result = _import_record(repo, record, args.accept_similar_as_new)
+        result = _import_record(repo, record, accept_similar_as_new)
         status = result.get("status", "needs_confirmation")
         stats[status] = stats.get(status, 0) + 1
         if status == "needs_confirmation" and len(unresolved) < 50:
@@ -203,7 +195,50 @@ def cmd_import(args: argparse.Namespace) -> None:
             repo.record_interaction(
                 person["id"], latest, "whatsapp", "Latest message in imported chat", "whatsapp"
             )
-    print(json.dumps({"counts": stats, "unresolved": unresolved}, indent=2, default=str))
+    return {"counts": stats, "unresolved": unresolved}
+
+
+def cmd_import(args: argparse.Namespace) -> None:
+    path = Path(args.path).expanduser()
+    if args.source == "linkedin":
+        records = parse_linkedin_csv(path)
+        interactions = {}
+    elif args.source == "google":
+        records = parse_google_csv(path)
+        interactions = {}
+    else:
+        if not args.self_name:
+            raise SystemExit("--self-name is required for WhatsApp exports")
+        try:
+            records, interactions = parse_whatsapp_export(path, args.self_name, args.date_order)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+
+    if args.dry_run:
+        print(json.dumps(_preview(records), indent=2))
+        return
+
+    repo = _repo()
+    result = _apply_import(repo, records, interactions, args.accept_similar_as_new)
+    print(json.dumps(result, indent=2, default=str))
+
+
+def cmd_sync_linkedin(args: argparse.Namespace) -> None:
+    token = os.environ.get("LINKEDIN_OAUTH_TOKEN")
+    if not token:
+        raise SystemExit("Set the LINKEDIN_OAUTH_TOKEN environment variable")
+    try:
+        records = fetch_linkedin_connections(token)
+    except RuntimeError as exc:
+        raise SystemExit(str(exc)) from exc
+
+    if args.dry_run:
+        print(json.dumps(_preview(records), indent=2))
+        return
+
+    repo = _repo()
+    result = _apply_import(repo, records, {}, args.accept_similar_as_new)
+    print(json.dumps(result, indent=2, default=str))
 
 
 def cmd_status(_: argparse.Namespace) -> None:
@@ -263,6 +298,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="create similar names as new people after manual review",
     )
     importer.set_defaults(func=cmd_import)
+
+    sync = sub.add_parser(
+        "sync-linkedin",
+        help="fetch 1st-degree connections live via LinkedIn's Member Data Portability API",
+    )
+    sync.add_argument("--dry-run", action="store_true", help="fetch and preview without writing")
+    sync.add_argument(
+        "--accept-similar-as-new",
+        action="store_true",
+        help="create similar names as new people after manual review",
+    )
+    sync.set_defaults(func=cmd_sync_linkedin)
     return parser
 
 

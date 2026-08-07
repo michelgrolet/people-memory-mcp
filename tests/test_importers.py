@@ -1,8 +1,13 @@
+import io
+import json
+import urllib.error
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from people_memory.importers import (
+    fetch_linkedin_connections,
     normalize_email,
     parse_google_csv,
     parse_linkedin_csv,
@@ -74,3 +79,131 @@ def test_ambiguous_whatsapp_date_requires_user_choice(tmp_path: Path) -> None:
     export.write_text("03/08/2026, 10:01 - Alan Turing: Hi\n", encoding="utf-8")
     with pytest.raises(ValueError, match="--date-order"):
         parse_whatsapp_export(export, "Me")
+
+
+class _FakeResponse:
+    def __init__(self, payload: dict) -> None:
+        self._body = json.dumps(payload).encode("utf-8")
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self) -> "_FakeResponse":
+        return self
+
+    def __exit__(self, *exc: object) -> bool:
+        return False
+
+
+def _snapshot_page(rows: list[dict], next_href: str | None = None) -> dict:
+    page = {"elements": [{"snapshotDomain": "CONNECTIONS", "snapshotData": rows}]}
+    if next_href:
+        page["paging"] = {"links": [{"rel": "next", "href": next_href}]}
+    return page
+
+
+def test_fetch_linkedin_connections_maps_same_fields_as_csv() -> None:
+    payload = {
+        "elements": [
+            {
+                "snapshotDomain": "CONNECTIONS",
+                "snapshotData": [
+                    {
+                        "First Name": "Ada",
+                        "Last Name": "Lovelace",
+                        "URL": "https://linkedin.com/in/ada",
+                        "Email Address": "ADA@example.com",
+                        "Company": "Analytical Engine",
+                        "Position": "Mathematician",
+                        "Connected On": "03 Aug 2026",
+                    }
+                ],
+            }
+        ]
+    }
+    with patch(
+        "people_memory.importers.urllib.request.urlopen",
+        return_value=_FakeResponse(payload),
+    ) as mock_urlopen:
+        records = fetch_linkedin_connections("fake-token")
+    assert len(records) == 1
+    assert records[0].full_name == "Ada Lovelace"
+    assert records[0].emails == ["ada@example.com"]
+    assert records[0].organization == "Analytical Engine"
+    assert records[0].connected_on.isoformat() == "2026-08-03"
+    assert records[0].source == "linkedin"
+    request = mock_urlopen.call_args[0][0]
+    assert request.get_header("Authorization") == "Bearer fake-token"
+    assert request.get_header("Linkedin-version") == "202312"
+    assert "domain=CONNECTIONS" in request.full_url
+
+
+def test_fetch_linkedin_connections_skips_rows_without_a_name() -> None:
+    payload = {"elements": [{"snapshotData": [{"Company": "Ghost Corp"}]}]}
+    with patch(
+        "people_memory.importers.urllib.request.urlopen", return_value=_FakeResponse(payload)
+    ):
+        records = fetch_linkedin_connections("fake-token")
+    assert records == []
+
+
+def test_fetch_linkedin_connections_follows_pagination_links() -> None:
+    page_one = _snapshot_page(
+        [{"First Name": "Ada", "Last Name": "Lovelace"}],
+        next_href="/rest/memberSnapshotData?q=criteria&domain=CONNECTIONS&start=1",
+    )
+    page_two = _snapshot_page([{"First Name": "Alan", "Last Name": "Turing"}])
+    responses = [_FakeResponse(page_one), _FakeResponse(page_two)]
+    with patch(
+        "people_memory.importers.urllib.request.urlopen", side_effect=responses
+    ) as mock_urlopen:
+        records = fetch_linkedin_connections("fake-token")
+    assert [record.full_name for record in records] == ["Ada Lovelace", "Alan Turing"]
+    assert mock_urlopen.call_count == 2
+    second_request = mock_urlopen.call_args_list[1][0][0]
+    assert second_request.full_url == (
+        "https://api.linkedin.com/rest/memberSnapshotData"
+        "?q=criteria&domain=CONNECTIONS&start=1"
+    )
+
+
+def test_fetch_linkedin_connections_stops_when_no_next_link() -> None:
+    payload = _snapshot_page([{"First Name": "Ada", "Last Name": "Lovelace"}])
+    with patch(
+        "people_memory.importers.urllib.request.urlopen",
+        return_value=_FakeResponse(payload),
+    ) as mock_urlopen:
+        records = fetch_linkedin_connections("fake-token")
+    assert len(records) == 1
+    assert mock_urlopen.call_count == 1
+
+
+def test_fetch_linkedin_connections_raises_readable_error_when_not_collated_yet() -> None:
+    error_body = json.dumps({"message": "No data found for this domain and memberId."}).encode()
+    http_error = urllib.error.HTTPError(
+        url="https://api.linkedin.com/rest/memberSnapshotData",
+        code=404,
+        msg="Not Found",
+        hdrs=None,
+        fp=io.BytesIO(error_body),
+    )
+    with (
+        patch("people_memory.importers.urllib.request.urlopen", side_effect=http_error),
+        pytest.raises(RuntimeError, match="404.*No data found"),
+    ):
+        fetch_linkedin_connections("fake-token")
+
+
+def test_fetch_linkedin_connections_raises_readable_error_on_non_json_body() -> None:
+    http_error = urllib.error.HTTPError(
+        url="https://api.linkedin.com/rest/memberSnapshotData",
+        code=502,
+        msg="Bad Gateway",
+        hdrs=None,
+        fp=io.BytesIO(b"<html><body>502 Bad Gateway</body></html>"),
+    )
+    with (
+        patch("people_memory.importers.urllib.request.urlopen", side_effect=http_error),
+        pytest.raises(RuntimeError, match="502.*non-JSON response"),
+    ):
+        fetch_linkedin_connections("fake-token")

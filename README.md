@@ -158,6 +158,20 @@ Imports resolve email or phone first, then name. They fill missing values and ne
 conflict silently. The `import-contacts` skill can inspect unfamiliar CSV columns and guide the user
 through ambiguous matches.
 
+LinkedIn also exposes 1st-degree connections live through its Member Data Portability API (DMA).
+Once you hold an OAuth token with the `r_dma_portability_self_serve` scope (see
+[LinkedIn's docs](https://learn.microsoft.com/en-us/linkedin/dma/member-data-portability/member-data-portability-member/)),
+you can sync without the manual export. Set the token as an environment variable — never pass it
+as a CLI flag, which would leak it through `ps` and shell history:
+
+```bash
+export LINKEDIN_OAUTH_TOKEN="..."
+uv run people-memory sync-linkedin
+```
+
+Right after consenting, LinkedIn may not have collated the `CONNECTIONS` domain yet — it raises a
+readable error in that case; retry later or fall back to the CSV export above.
+
 ## Optional connectors
 
 People Memory does not collect Gmail, Calendar, Drive, or WhatsApp credentials. The `enrich-people`
