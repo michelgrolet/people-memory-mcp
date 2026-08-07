@@ -119,3 +119,62 @@ def test_resolve_person_single_fuzzy_match_needs_confirmation() -> None:
     fuzzy = repo.resolve_person("Michel")
     assert fuzzy["status"] == "needs_confirmation"
     assert [c["full_name"] for c in fuzzy["candidates"]] == ["Michel Grolet"]
+
+
+def test_add_fact_exact_repeat_is_idempotent() -> None:
+    repo = _repo()
+    with repo.db.connection() as conn:
+        conn.execute(
+            "truncate deleted_records, interactions, facts, edges, affiliations, identifiers, "
+            "orgs, people restart identity cascade"
+        )
+    person = repo.remember_person(full_name="Katherine Johnson", confirmed_new=True, source="test")
+    person_id = person["person"]["id"]
+
+    first = repo.add_fact(
+        person_id, "linkedin_connected_on", "2024-05-12", source="linkedin", confidence="observed"
+    )
+    second = repo.add_fact(
+        person_id, "linkedin_connected_on", "2024-05-12", source="linkedin", confidence="observed"
+    )
+
+    assert first["id"] == second["id"]
+    rows = repo.read_query(
+        f"select count(*) as n from facts where person_id = {person_id} "
+        "and key = 'linkedin_connected_on'"
+    )
+    assert rows[0]["n"] == 1
+
+
+def test_add_fact_same_value_different_date_is_not_deduped() -> None:
+    repo = _repo()
+    with repo.db.connection() as conn:
+        conn.execute(
+            "truncate deleted_records, interactions, facts, edges, affiliations, identifiers, "
+            "orgs, people restart identity cascade"
+        )
+    person = repo.remember_person(full_name="Dorothy Vaughan", confirmed_new=True, source="test")
+    person_id = person["person"]["id"]
+
+    first = repo.add_fact(
+        person_id, "weight_kg", "70", fact_date=date(2026, 1, 1), source="test"
+    )
+    second = repo.add_fact(
+        person_id, "weight_kg", "70", fact_date=date(2026, 2, 1), source="test"
+    )
+
+    assert first["id"] != second["id"]
+    rows = repo.read_query(
+        f"select count(*) as n from facts where person_id = {person_id} and key = 'weight_kg'"
+    )
+    assert rows[0]["n"] == 2
+
+    # Re-adding the exact same (value, date) pair a second time is still a no-op.
+    repeat = repo.add_fact(
+        person_id, "weight_kg", "70", fact_date=date(2026, 2, 1), source="test"
+    )
+    assert repeat["id"] == second["id"]
+    rows = repo.read_query(
+        f"select count(*) as n from facts where person_id = {person_id} and key = 'weight_kg'"
+    )
+    assert rows[0]["n"] == 2
