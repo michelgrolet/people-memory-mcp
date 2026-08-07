@@ -159,7 +159,9 @@ def _preview(records) -> dict:
     return {"records": len(records), "sample": sample}
 
 
-def _apply_import(repo: GraphRepository, records, interactions: dict, accept_similar_as_new: bool) -> dict:
+def _apply_import(
+    repo: GraphRepository, records, interactions: dict, accept_similar_as_new: bool
+) -> dict:
     stats = {"created": 0, "updated": 0, "needs_confirmation": 0}
     unresolved = []
     for record in records:
@@ -222,9 +224,9 @@ def cmd_import(args: argparse.Namespace) -> None:
 
 
 def cmd_sync_linkedin(args: argparse.Namespace) -> None:
-    token = args.token or os.environ.get("LINKEDIN_OAUTH_TOKEN")
+    token = os.environ.get("LINKEDIN_OAUTH_TOKEN")
     if not token:
-        raise SystemExit("Provide --token or set the LINKEDIN_OAUTH_TOKEN environment variable")
+        raise SystemExit("Set the LINKEDIN_OAUTH_TOKEN environment variable")
     try:
         records = fetch_linkedin_connections(token)
     except RuntimeError as exc:
@@ -301,7 +303,6 @@ def build_parser() -> argparse.ArgumentParser:
         "sync-linkedin",
         help="fetch 1st-degree connections live via LinkedIn's Member Data Portability API",
     )
-    sync.add_argument("--token", help="OAuth access token (else reads LINKEDIN_OAUTH_TOKEN env var)")
     sync.add_argument("--dry-run", action="store_true", help="fetch and preview without writing")
     sync.add_argument(
         "--accept-similar-as-new",

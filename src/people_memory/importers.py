@@ -4,6 +4,7 @@ import csv
 import json
 import re
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -94,30 +95,49 @@ def fetch_linkedin_connections(access_token: str, *, timeout: float = 30.0) -> l
     r_dma_portability_self_serve (or r_dma_portability_3rd_party) scope — see
     https://learn.microsoft.com/en-us/linkedin/dma/member-data-portability/.
 
+    The Snapshot API paginates via `start`/`count`, advertised as a `rel=next` entry
+    in the response's `paging.links` — this follows that chain until exhausted,
+    aggregating every page's elements.
+
     Raises RuntimeError (with LinkedIn's own message) if the domain isn't collated
     yet — common right after a member first consents, LinkedIn processes it async.
     """
-    request = urllib.request.Request(
-        f"{LINKEDIN_SNAPSHOT_URL}?q=criteria&domain=CONNECTIONS",
-        headers={
-            "Authorization": f"Bearer {access_token}",
-            "Linkedin-Version": LINKEDIN_API_VERSION,
-            "Content-Type": "application/json",
-        },
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        body = json.loads(exc.read().decode("utf-8"))
-        raise RuntimeError(f"LinkedIn API error {exc.code}: {body.get('message', body)}") from exc
-
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Linkedin-Version": LINKEDIN_API_VERSION,
+        "Content-Type": "application/json",
+    }
+    url: str | None = f"{LINKEDIN_SNAPSHOT_URL}?q=criteria&domain=CONNECTIONS"
     records: list[ContactRecord] = []
-    for element in payload.get("elements", []):
-        for row in element.get("snapshotData", []):
-            record = _connection_record_from_row(row)
-            if record is not None:
-                records.append(record)
+    while url:
+        request = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            raw_body = exc.read().decode("utf-8", errors="replace")
+            try:
+                body = json.loads(raw_body)
+            except json.JSONDecodeError:
+                raise RuntimeError(
+                    f"LinkedIn API error {exc.code}: non-JSON response ({raw_body[:200]!r})"
+                ) from exc
+            raise RuntimeError(
+                f"LinkedIn API error {exc.code}: {body.get('message', body)}"
+            ) from exc
+
+        for element in payload.get("elements", []):
+            for row in element.get("snapshotData", []):
+                record = _connection_record_from_row(row)
+                if record is not None:
+                    records.append(record)
+
+        url = None
+        for link in payload.get("paging", {}).get("links", []):
+            if link.get("rel") == "next" and link.get("href"):
+                url = urllib.parse.urljoin(LINKEDIN_SNAPSHOT_URL, link["href"])
+                break
+
     return records
 
 
