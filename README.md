@@ -202,8 +202,16 @@ Set `owner_email`, enable the desired Auth providers, and deploy `web/` to a sta
 uses only the publishable key. Row-level security rejects every account except the configured owner.
 The MCP server uses a direct PostgreSQL URL stored outside Git.
 
-For an existing non-Supabase PostgreSQL database, apply only
-`supabase/migrations/20260803000000_core.sql` and use the optional API for browser access.
+For an existing non-Supabase PostgreSQL database, apply every file in `supabase/migrations/` in
+filename order and use the optional API for browser access:
+
+```bash
+for f in supabase/migrations/*.sql; do psql "$PEOPLE_MEMORY_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"; done
+```
+
+`20260803000100_security.sql` expects the Supabase `anon`/`authenticated` roles and an `auth.jwt()`
+function; outside Supabase, create them first or skip that file and keep the database private.
+Upgrading an existing install means applying the migrations it has not seen yet, in the same order.
 
 ## Optional REST API
 
