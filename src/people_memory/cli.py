@@ -185,10 +185,14 @@ def _apply_import(
             unresolved.append({"incoming": record.full_name, **conflict})
         person = result.get("person") or {}
         if status in {"created", "updated"} and record.connected_on:
+            # `date` as well as `value`: the ISO string is what a person reads on a card, the date
+            # column is what SQL can filter and sort on. Writing only the string means every query
+            # about when a connection happened has to parse text first.
             repo.add_fact(
                 person["id"],
                 "linkedin_connected_on",
                 record.connected_on.isoformat(),
+                fact_date=record.connected_on,
                 source="linkedin",
                 confidence="observed",
             )
