@@ -1,6 +1,7 @@
 import io
 import json
 import urllib.error
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
@@ -9,6 +10,7 @@ import pytest
 from people_memory.importers import (
     fetch_linkedin_connections,
     normalize_email,
+    parse_birthday,
     parse_google_csv,
     parse_linkedin_csv,
     parse_whatsapp_export,
@@ -47,6 +49,35 @@ def test_parse_google_export(tmp_path: Path) -> None:
     assert records[0].full_name == "Grace Hopper"
     assert records[0].phones == ["+12025550123"]
     assert records[0].source == "google"
+
+
+def test_parse_google_export_reads_birthdays(tmp_path: Path) -> None:
+    """Google writes most birthdays without a year, as `--MM-DD`. Both shapes must survive."""
+    export = tmp_path / "contacts.csv"
+    export.write_text(
+        "Name,E-mail 1 - Value,Birthday\n"
+        "Grace Hopper,grace@example.com,1906-12-09\n"
+        "Ada Lovelace,ada@example.com,--12-10\n"
+        "Alan Turing,alan@example.com,\n",
+        encoding="utf-8",
+    )
+    grace, ada, alan = parse_google_csv(export)
+    assert grace.birthdate.isoformat() == "1906-12-09"
+    assert grace.birthday_md is None
+    assert ada.birthdate is None
+    assert ada.birthday_md == "12-10"
+    assert alan.birthdate is None and alan.birthday_md is None
+
+
+def test_parse_birthday_shapes() -> None:
+    assert parse_birthday("1906-12-09") == (date(1906, 12, 9), None)
+    assert parse_birthday("12/09/1906") == (date(1906, 12, 9), None)
+    assert parse_birthday("--12-10") == (None, "12-10")
+    assert parse_birthday("12-10") == (None, "12-10")
+    # Nothing usable rather than a guess: a lone year would have to invent a day and a month.
+    assert parse_birthday("1906") == (None, None)
+    assert parse_birthday("  ") == (None, None)
+    assert parse_birthday(None) == (None, None)
 
 
 def test_parse_whatsapp_export(tmp_path: Path) -> None:

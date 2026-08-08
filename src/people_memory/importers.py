@@ -28,6 +28,8 @@ class ContactRecord:
     country: str | None = None
     linkedin_url: str | None = None
     connected_on: date | None = None
+    birthdate: date | None = None
+    birthday_md: str | None = None
     source: str = "import"
 
 
@@ -141,6 +143,33 @@ def fetch_linkedin_connections(access_token: str, *, timeout: float = 30.0) -> l
     return records
 
 
+def parse_birthday(raw: str | None) -> tuple[date | None, str | None]:
+    """Split a contact-export birthday into a full date and a month-day.
+
+    Google writes a year-less birthday as `--05-14`, which is most of them: people fill in the day
+    they celebrate and leave the year out. Dropping those loses the only field the whole reason to
+    have birthdays depends on, so keep them as `MM-DD` in `birthday_md` instead of forcing a fake
+    year. Returns `(birthdate, birthday_md)`, at most one of which is set.
+    """
+    if not raw:
+        return None, None
+    value = raw.strip()
+    if not value:
+        return None, None
+    match = re.fullmatch(r"-{2}(\d{2})-(\d{2})", value)
+    if match:
+        return None, f"{match.group(1)}-{match.group(2)}"
+    for pattern in ("%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%b %d, %Y", "%d %B %Y"):
+        try:
+            return datetime.strptime(value, pattern).date(), None
+        except ValueError:
+            continue
+    match = re.fullmatch(r"(\d{2})-(\d{2})", value)
+    if match:
+        return None, value
+    return None, None
+
+
 def parse_google_csv(path: Path) -> list[ContactRecord]:
     records: list[ContactRecord] = []
     with path.open(encoding="utf-8-sig", errors="replace", newline="") as handle:
@@ -162,6 +191,9 @@ def parse_google_csv(path: Path) -> list[ContactRecord]:
                 for key, raw in row.items()
                 if key and "phone" in key.lower() and raw and raw.strip()
             ]
+            birthdate, birthday_md = parse_birthday(
+                _first(row, "Birthday", "Event 1 - Value")
+            )
             records.append(
                 ContactRecord(
                     full_name=full_name,
@@ -173,6 +205,8 @@ def parse_google_csv(path: Path) -> list[ContactRecord]:
                     role=_first(row, "Organization 1 - Title", "Job Title"),
                     city=_first(row, "Address 1 - City", "City"),
                     country=_first(row, "Address 1 - Country", "Country"),
+                    birthdate=birthdate,
+                    birthday_md=birthday_md,
                     source="google",
                 )
             )

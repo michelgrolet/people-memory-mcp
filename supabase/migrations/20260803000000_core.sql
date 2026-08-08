@@ -96,6 +96,7 @@ create index if not exists edges_b_idx on edges(b_id, kind);
 create or replace function canonicalize_symmetric_edge()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 declare
   original_a bigint;
@@ -158,6 +159,7 @@ create table if not exists deleted_records (
 create or replace function touch_updated_at()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 begin
   new.updated_at = now();
@@ -268,6 +270,7 @@ returns table (
 )
 language sql
 stable
+set search_path = public
 as $$
   with recursive paths(person_id, depth, route_ids, route_names) as (
     select p.id, 0, array[p.id]::bigint[], array[p.full_name]::text[]
@@ -305,6 +308,7 @@ create or replace function delete_person(p_id bigint)
 returns boolean
 language plpgsql
 security invoker
+set search_path = public
 as $$
 declare
   snapshot jsonb;

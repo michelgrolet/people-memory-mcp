@@ -10,6 +10,9 @@ as $$
 $$;
 
 revoke all on function is_people_memory_owner() from public;
+-- Supabase's default privileges grant execute on new functions to `anon` DIRECTLY, so the
+-- revoke above (which only drops the PUBLIC grant) leaves it callable without signing in.
+revoke execute on function is_people_memory_owner() from anon;
 grant execute on function is_people_memory_owner() to authenticated;
 
 alter table app_settings enable row level security;

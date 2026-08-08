@@ -199,6 +199,8 @@ class GraphRepository:
         city: str | None = None,
         country: str | None = None,
         summary: str | None = None,
+        birthdate: date | str | None = None,
+        birthday_md: str | None = None,
         fact_key: str | None = None,
         fact_value: str | None = None,
         source: str = "agent",
@@ -261,6 +263,8 @@ class GraphRepository:
                 "city": city,
                 "country": country,
                 "summary": summary,
+                "birthdate": birthdate,
+                "birthday_md": birthday_md,
             }
             if candidates:
                 person_id = candidates[0]["id"]
@@ -299,9 +303,9 @@ class GraphRepository:
                     """
                     insert into people (
                       full_name, current_org, "current_role", linkedin_url,
-                      city, country, summary
+                      city, country, summary, birthdate, birthday_md
                     )
-                    values (%s, %s, %s, %s, %s, %s, %s) returning id
+                    values (%s, %s, %s, %s, %s, %s, %s, %s, %s) returning id
                     """,
                     (
                         full_name,
@@ -311,6 +315,8 @@ class GraphRepository:
                         city,
                         country,
                         summary,
+                        birthdate,
+                        birthday_md,
                     ),
                 ).fetchone()["id"]
                 created = True
