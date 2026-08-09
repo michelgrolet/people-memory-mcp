@@ -1,6 +1,29 @@
 create schema if not exists extensions;
 create extension if not exists pg_trgm with schema extensions;
 
+-- `facts.date`, `affiliations.since`/`until` and `edges.since`/`until` below are "partial dates":
+-- a date somebody only half remembers. "He joined in 2015", "it ended in 2023-09". They are ISO-8601
+-- prefixes in text (`YYYY`, `YYYY-MM`, `YYYY-MM-DD`) rather than `date` columns, because a `date`
+-- can only hold that by inventing a month and a day, and inventing data to satisfy a column type is
+-- worse than admitting the day is unknown. Same reasoning as `birthday_md` next to `birthdate`.
+--
+-- ISO prefixes sort and compare correctly as plain strings, so `order by since` and `where until >=
+-- '2024'` behave. What it costs is arithmetic, which needs an explicit cast and is only as precise as
+-- the coarser operand. A range (`2019-2020`) or a status (`ongoing`) is not a date and belongs in a
+-- text value next to the fact it describes.
+--
+-- One consequence to know about, in the `until >= since` checks below: when `until` is coarser than
+-- `since`, string comparison is stricter than the calendar. `since = '2023-09'` with `until = '2023'`
+-- is rejected even though it could mean "ended in December". Record the coarse end as the year it
+-- actually falls in, or leave it null and put the wording in a text field.
+--
+-- The pattern is repeated per column rather than hidden in a domain on purpose: adding a domain to
+-- a table that already exists means `alter column type`, which Postgres refuses while any view reads
+-- the column, so it would force every installation to drop and rebuild its views (and their grants)
+-- for a constraint that a plain CHECK adds without touching anything. Kept identical to
+-- PARTIAL_DATE_PATTERN in people_memory/dates.py: Postgres and Python must agree on what is
+-- storable, or one rejects what the other just accepted.
+
 create table if not exists app_settings (
   key text primary key,
   value text not null,
@@ -66,8 +89,10 @@ create table if not exists affiliations (
   person_id bigint not null references people(id) on delete cascade,
   org_id bigint not null references orgs(id) on delete cascade,
   role text not null default '',
-  since date,
-  until date,
+  since text constraint affiliations_since_partial_date_check
+    check (since is null or since ~ '^\d{4}(-\d{2}(-\d{2})?)?$'),
+  until text constraint affiliations_until_partial_date_check
+    check (until is null or until ~ '^\d{4}(-\d{2}(-\d{2})?)?$'),
   source text not null default 'manual',
   observed_at date not null default current_date,
   primary key (person_id, org_id, role),
@@ -81,8 +106,10 @@ create table if not exists edges (
   b_id bigint not null references people(id) on delete cascade,
   kind text not null check (length(trim(kind)) > 0),
   strength smallint check (strength between 1 and 5),
-  since date,
-  until date,
+  since text constraint edges_since_partial_date_check
+    check (since is null or since ~ '^\d{4}(-\d{2}(-\d{2})?)?$'),
+  until text constraint edges_until_partial_date_check
+    check (until is null or until ~ '^\d{4}(-\d{2}(-\d{2})?)?$'),
   note text,
   source text not null default 'manual',
   observed_at date not null default current_date,
@@ -124,7 +151,8 @@ create table if not exists facts (
   key text not null check (length(trim(key)) > 0),
   value text,
   num double precision,
-  date date,
+  date text constraint facts_date_partial_date_check
+    check (date is null or date ~ '^\d{4}(-\d{2}(-\d{2})?)?$'),
   source text not null default 'manual',
   observed_at date not null default current_date,
   confidence text not null default 'stated'

@@ -10,8 +10,9 @@
 -- so rows that never set `date`/`num` (e.g. `linkedin_connected_on`, which encodes the date in
 -- `value` and leaves `date`/`num` NULL) would stop deduping at all - reintroducing the exact bug
 -- this migration exists to fix. COALESCE both columns to a sentinel ('-infinity' / NaN) so "no
--- date/num recorded" is one consistent group instead of "always distinct". Both sentinels are
--- real Postgres literals that a genuine person fact will not plausibly contain.
+-- date/num recorded" is one consistent group instead of "always distinct". Neither sentinel can
+-- collide with a real value: `date` is a `partial_date`, whose constraint rejects the empty string,
+-- and NaN is not a number anyone records about a person.
 delete from facts a
 using facts b
 where a.id > b.id
@@ -19,7 +20,7 @@ where a.id > b.id
   and a.key = b.key
   and a.value = b.value
   and a.value is not null
-  and coalesce(a.date, '-infinity'::date) = coalesce(b.date, '-infinity'::date)
+  and coalesce(a.date, '') = coalesce(b.date, '')
   and coalesce(a.num, 'NaN'::double precision) = coalesce(b.num, 'NaN'::double precision);
 
 create unique index if not exists facts_person_key_value_date_num_uidx
@@ -27,7 +28,7 @@ create unique index if not exists facts_person_key_value_date_num_uidx
     person_id,
     key,
     value,
-    coalesce(date, '-infinity'::date),
+    coalesce(date, ''),
     coalesce(num, 'NaN'::double precision)
   )
   where value is not null;

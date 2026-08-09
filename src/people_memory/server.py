@@ -115,19 +115,22 @@ def add_fact(
     fact_date: str | None = None,
     confidence: str = "stated",
 ) -> dict[str, Any]:
-    """Attach a durable fact to a person. Ask the user if the name is ambiguous."""
+    """Attach a durable fact to a person. Ask the user if the name is ambiguous.
+
+    fact_date takes what is actually known: YYYY-MM-DD, or YYYY-MM, or YYYY on its own. Pass the
+    coarsest form that is true rather than filling in a day nobody said.
+    """
     if confidence not in {"stated", "observed", "inferred"}:
         raise ValueError("confidence must be stated, observed, or inferred")
     person_id, unresolved = _resolve(person_name)
     if unresolved:
         return unresolved
-    parsed_date = date.fromisoformat(fact_date) if fact_date else None
     fact = _repo().add_fact(
         person_id,
         key,
         value,
         num=number,
-        fact_date=parsed_date,
+        fact_date=fact_date,
         source=_settings().default_source,
         confidence=confidence,
     )

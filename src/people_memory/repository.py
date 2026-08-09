@@ -6,6 +6,7 @@ from typing import Any
 
 from psycopg import sql
 
+from .dates import normalize_partial_date
 from .db import Database
 from .sql_guard import guard_read, guard_write
 
@@ -359,7 +360,7 @@ class GraphRepository:
                     values (%s, %s, %s, %s, 'stated')
                     on conflict (
                         person_id, key, value,
-                        coalesce(date, '-infinity'::date),
+                        coalesce(date, ''),
                         coalesce(num, 'NaN'::double precision)
                     ) where value is not null do nothing
                     """,
@@ -435,17 +436,18 @@ class GraphRepository:
         value: str | None,
         *,
         num: float | None = None,
-        fact_date: date | None = None,
+        fact_date: date | str | None = None,
         source: str = "agent",
         confidence: str = "stated",
     ) -> dict[str, Any]:
+        fact_date = normalize_partial_date(fact_date)
         row = self.db.fetch_one(
             """
             insert into facts (person_id, key, value, num, date, source, confidence)
             values (%s, %s, %s, %s, %s, %s, %s)
             on conflict (
                 person_id, key, value,
-                coalesce(date, '-infinity'::date),
+                coalesce(date, ''),
                 coalesce(num, 'NaN'::double precision)
             ) where value is not null do nothing
             returning *
