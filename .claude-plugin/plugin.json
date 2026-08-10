@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "people-memory",
+  "version": "0.1.0",
+  "description": "A private people graph that gives your agent durable memory of everyone you know. MCP tools to search, remember and connect people, plus skills that retrieve and record them during ordinary conversation.",
+  "author": {
+    "name": "Michel Grolet",
+    "url": "https://github.com/michelgrolet"
+  },
+  "homepage": "https://github.com/michelgrolet/people-memory-mcp",
+  "repository": "https://github.com/michelgrolet/people-memory-mcp",
+  "license": "MIT",
+  "keywords": ["people", "memory", "contacts", "knowledge-graph", "mcp", "crm"],
+  "skills": ["./skills"],
+  "mcpServers": {
+    "people-memory": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/michelgrolet/people-memory-mcp", "people-memory-mcp"]
+    }
+  }
+}
