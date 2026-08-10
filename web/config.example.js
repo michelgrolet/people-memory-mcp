@@ -11,4 +11,8 @@ window.PEOPLE_MEMORY_CONFIG = {
 
   // Disable after creating the single owner account.
   allowSignup: true,
+
+  // Set false to hide the email/password form and leave Google as the only way
+  // in. Match it to the Supabase email provider: if that is off, this is false.
+  passwordLogin: true,
 };
