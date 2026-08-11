@@ -121,6 +121,30 @@ def test_resolve_person_single_fuzzy_match_needs_confirmation() -> None:
     assert [c["full_name"] for c in fuzzy["candidates"]] == ["Michel Grolet"]
 
 
+def test_remember_person_resolves_similarity_from_extensions_schema() -> None:
+    repo = _repo()
+    with repo.db.connection() as conn:
+        conn.execute(
+            "truncate deleted_records, interactions, facts, edges, affiliations, identifiers, "
+            "orgs, people restart identity cascade"
+        )
+    try:
+        created = repo.remember_person(
+            full_name="Aster Vale", confirmed_new=True, source="test"
+        )
+        assert created["status"] == "created"
+
+        similar = repo.remember_person(full_name="Aster Vail", source="test")
+        assert similar["status"] == "needs_confirmation"
+        assert [candidate["full_name"] for candidate in similar["candidates"]] == ["Aster Vale"]
+    finally:
+        with repo.db.connection() as conn:
+            conn.execute(
+                "truncate deleted_records, interactions, facts, edges, affiliations, identifiers, "
+                "orgs, people restart identity cascade"
+            )
+
+
 def test_add_fact_exact_repeat_is_idempotent() -> None:
     repo = _repo()
     with repo.db.connection() as conn:

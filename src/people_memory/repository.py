@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 from datetime import date
+from difflib import SequenceMatcher
 from typing import Any
 
 from psycopg import sql
@@ -26,6 +29,26 @@ PERSON_FIELDS = {
     "met_when",
     "summary",
 }
+
+
+def _normalize_name(value: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", value.casefold())
+    without_marks = "".join(
+        character for character in decomposed if not unicodedata.combining(character)
+    )
+    return " ".join(re.findall(r"[a-z0-9]+", without_marks))
+
+
+def _name_similarity(left: str, right: str) -> float:
+    left_normalized = _normalize_name(left)
+    right_normalized = _normalize_name(right)
+    if not left_normalized or not right_normalized:
+        return 0.0
+    direct = SequenceMatcher(None, left_normalized, right_normalized).ratio()
+    left_sorted = " ".join(sorted(left_normalized.split()))
+    right_sorted = " ".join(sorted(right_normalized.split()))
+    reordered = SequenceMatcher(None, left_sorted, right_sorted).ratio()
+    return max(direct, reordered)
 
 
 class GraphRepository:
@@ -235,18 +258,16 @@ class GraphRepository:
                     "candidates": candidates,
                 }
             if not candidates and not confirmed_new:
-                similar = list(
-                    conn.execute(
-                        """
-                        select id, full_name, current_org, city,
-                               similarity(lower(full_name), lower(%s)) as similarity
-                        from people
-                        where similarity(lower(full_name), lower(%s)) >= 0.62
-                        order by similarity desc limit 5
-                        """,
-                        (full_name, full_name),
-                    ).fetchall()
-                )
+                people = conn.execute(
+                    "select id, full_name, current_org, city from people"
+                ).fetchall()
+                similar = []
+                for person in people:
+                    similarity = _name_similarity(person["full_name"], full_name)
+                    if similarity >= 0.78:
+                        similar.append({**person, "similarity": similarity})
+                similar.sort(key=lambda person: person["similarity"], reverse=True)
+                similar = similar[:5]
                 if similar:
                     return {
                         "status": "needs_confirmation",
