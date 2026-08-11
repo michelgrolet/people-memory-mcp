@@ -108,6 +108,22 @@ Start a new agent session after adding an MCP server. Install or invoke `setup-p
 the plugin to add the durable memory rule, choose imports, connect optional data sources, and verify
 the complete flow.
 
+### With TARS, optionally
+
+People Memory is standalone and stays standalone: nothing above requires a particular harness, and
+the agent you already use is the one it wires into. [TARS](https://github.com/michelgrolet/tars) is
+a harness for a personal agent that lists People Memory in its extension registry, so if you happen
+to run it, one command does the clone and the wiring:
+
+```bash
+claude plugin marketplace add michelgrolet/tars
+claude plugin install people-memory@tars
+```
+
+What that adds over the plain MCP server is when the tools fire: TARS puts the trigger in the one
+file it loads on every session, so the agent looks a person up before answering instead of waiting
+to be told to. Without it, the `remember-people` skill does the same job once you install it.
+
 ### Install the agent skills from a clone
 
 Codex discovers skills in `~/.agents/skills`; Claude Code uses `~/.claude/skills`. Symlink every
