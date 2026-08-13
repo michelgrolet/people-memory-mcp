@@ -1750,12 +1750,15 @@ function simStep() {
   // link that starts far apart cannot inject a huge velocity in one step
   for (const l of links) {
     const a = nodes[l.s], b = nodes[l.t];
-    // hubs push their leaves further out, otherwise a 60-degree node becomes a smear
-    const target = (l.kind === "suborg" ? SUBORG_DIST : l.kind === "org" ? ORG_DIST : LINK_DIST) + Math.min(150, (a.deg + b.deg) * .8) + a.r + b.r;
+    // hubs push their leaves further out, otherwise a 60-degree node becomes a smear. A suborg is
+    // the exception: it sits inside its parent, so the two diamonds belong side by side however
+    // many people hang off each — and the spring has to be stiff enough to win against both crowds.
+    const target = l.kind === "suborg" ? SUBORG_DIST + a.r + b.r
+      : (l.kind === "org" ? ORG_DIST : LINK_DIST) + Math.min(150, (a.deg + b.deg) * .8) + a.r + b.r;
     let dx = (b.x + b.vx) - (a.x + a.vx), dy = (b.y + b.vy) - (a.y + a.vy);
     let d = Math.sqrt(dx * dx + dy * dy);
     if (d < 1e-6) { dx = .5; dy = .5; d = .7071; }
-    const st = 1 / (1 + Math.min(a.deg, b.deg));
+    const st = l.kind === "suborg" ? .5 : 1 / (1 + Math.min(a.deg, b.deg));
     const f = (d - target) / d * alpha * st;
     const bias = a.deg / (a.deg + b.deg);
     if (!b.fixed) { b.vx -= dx * f * bias; b.vy -= dy * f * bias; }
