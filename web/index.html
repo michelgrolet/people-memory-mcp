@@ -24,7 +24,7 @@
     --txt:#E9EBEF; --txt2:#A7ADBA; --muted:#6E7480;
     --accent:#F5A524; --accent2:#FFC65C; --accent-dim:rgba(245,165,36,.14);
     --org:#2DD4BF; --red:#F0645F; --ok:#4ADE80;
-    --t0:#4A4F5C; --t1:#727888; --t2:#9B8B6C; --t3:#C79C4E; --t4:#EDB13C; --t5:#FFD36E;
+    --t0:#4A4F5C; --t1:#8F8360; --t2:#C79C4E; --t3:#EDB13C;
     --r-sm:5px; --r-md:9px; --r-lg:14px;
     --shadow:0 18px 50px -12px rgba(0,0,0,.7), 0 2px 8px rgba(0,0,0,.4);
     --ease:cubic-bezier(.16,1,.3,1);
@@ -590,12 +590,12 @@
   <div id="activeFilters"></div>
 
   <div id="legend">
-    <div class="row">contact
+    <div class="row">not rated
       <span class="ramp">
         <i style="background:var(--t0)"></i><i style="background:var(--t1)"></i><i style="background:var(--t2)"></i>
-        <i style="background:var(--t3)"></i><i style="background:var(--t4)"></i><i style="background:var(--t5)"></i>
+        <i style="background:var(--t3)"></i>
       </span>
-      inner circle
+      close
     </div>
     <div class="row"><span class="dia" style="background:var(--org)"></span> organization</div>
     <div class="row" style="opacity:.65">unconnected people stay in the directory <kbd>⌘K</kbd></div>
@@ -673,9 +673,9 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = id => document.getElementById(id);
 const EDGE_KINDS = ["friend","family","partner","colleague","classmate","knows","sibling","neighbour","mentor_of","manager_of","introduced"];
 const CHANNELS = ["irl","call","whatsapp","email","linkedin","sms","visio"];
-const TIE_LABEL = {1:"contact",2:"acquaintance",3:"friend",4:"close",5:"inner circle"};
-const TIE_COLOR = ["#4A4F5C","#727888","#9B8B6C","#C79C4E","#EDB13C","#FFD36E"];
-const ALL_TIES = ["0", "1", "2", "3", "4", "5"];
+const TIE_LABEL = {1:"acquaintance",2:"friend",3:"close"};
+const TIE_COLOR = ["#4A4F5C","#8F8360","#C79C4E","#EDB13C"];
+const ALL_TIES = ["0", "1", "2", "3"];
 const ORG_COLOR = "#2DD4BF";
 const EXPAND_ICON = '<svg class="icon" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m11-5v3a2 2 0 0 0-2 2h-3"/></svg>';
 const AGENT_COLOR = "#C084FC";
@@ -1693,10 +1693,10 @@ function renderDrawer(p) {
           <div class="fld"><label class="fl">Country</label><input id="f_country" value="${v("country")}"></div>
         </div>
         <div class="fld"><label class="fl">Relationship strength <em class="fl-hint" id="tieOut">${esc(tieLabel(p.tie))}</em></label>
-          <input type="range" id="f_tie" min="0" max="5" step="1" value="${p.tie || 0}" list="tieMarks"
+          <input type="range" id="f_tie" min="0" max="3" step="1" value="${p.tie || 0}" list="tieMarks"
             style="width:100%;accent-color:${tieColor(p.tie)}">
-          <datalist id="tieMarks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option><option value="4"></option><option value="5"></option></datalist>
-          <div class="tie-ticks" id="tieTicks">${[1, 2, 3, 4, 5].map(n => `<span${p.tie === n ? ' class="on"' : ""}>${TIE_LABEL[n]}</span>`).join("")}</div></div>
+          <datalist id="tieMarks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option></datalist>
+          <div class="tie-ticks" id="tieTicks">${[1, 2, 3].map(n => `<span${p.tie === n ? ' class="on"' : ""}>${TIE_LABEL[n]}</span>`).join("")}</div></div>
         <div class="grid2">
           <div class="fld"><label class="fl">Birth date${p.age != null ? ` <em class="fl-hint">${p.age} years old</em>` : ""}</label>
             <input type="date" id="f_bd" value="${v("birthdate")}"></div>
@@ -1995,7 +1995,7 @@ function renderForm() {
       </div>
       <div class="fld"><label class="fl">Relationship strength</label><select id="f_tie">
         <option value="">not rated</option>
-        ${[1, 2, 3, 4, 5].map(n => `<option value="${n}">${n}: ${TIE_LABEL[n]}</option>`).join("")}
+        ${[1, 2, 3].map(n => `<option value="${n}">${n}: ${TIE_LABEL[n]}</option>`).join("")}
       </select></div>
       <div class="grid2">
         <div class="fld"><label class="fl">Birth date</label><input type="date" id="f_bd"></div>
@@ -2133,7 +2133,7 @@ function newPerson(name) {
 
 // ── filters UI ────────────────────────────────────────────
 function renderFilters() {
-  $("ties").innerHTML = [0, 1, 2, 3, 4, 5].map(t => `
+  $("ties").innerHTML = [0, 1, 2, 3].map(t => `
     <button class="tie-btn" data-tie="${t}" aria-pressed="${tieFilter.has(String(t))}" title="${tieLabel(t || null)}">
       <span class="sw" style="background:${tieColor(t)}"></span>${t || "—"}</button>`).join("");
   $("ties").querySelectorAll("[data-tie]").forEach(b => b.onclick = () => {
