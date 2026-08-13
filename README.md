@@ -223,6 +223,17 @@ Supported patterns include:
 
 See [docs/connectors.md](docs/connectors.md) for the permission and identity rules.
 
+### Shared days, if you also keep a location archive
+
+Off by default. Set `locationCompanions: true` in `web/config.js` when the same database also
+carries the schema from [tars-location-mcp](https://github.com/michelgrolet/tars-location-mcp).
+The record card then gets a **With me** block: give a person a date range, times optional, and
+the location archive answers where the two of you were — cities, countries, and the trip it
+falls in. Nothing is typed twice, and nothing about a place is stored on the person.
+
+People Memory owns none of those tables. With the flag off, or with the tables absent, the
+block does not render and the app loads exactly as before.
+
 ## Hosted Supabase
 
 Create a free Supabase project, then apply the checked-in migrations:

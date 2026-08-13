@@ -904,6 +904,22 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const norm = s => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const tieColor = t => TIE_COLOR[t || 0];
 const tieLabel = t => t ? TIE_LABEL[t] : "not rated";
+
+// A shared window reads back in the timezone it was recorded in, never the reader's: a
+// dinner in San Francisco stays an evening when the card is opened from Paris.
+const companionWhen = c => {
+  if (!c.has_time) return c.started_on === c.ended_on ? c.started_on : `${c.started_on} → ${c.ended_on}`;
+  const t = iso => new Date(iso).toLocaleTimeString("en-GB",
+    { hour: "2-digit", minute: "2-digit", timeZone: c.tz || "UTC" });
+  return c.started_on === c.ended_on
+    ? `${c.started_on} ${t(c.started_at)}–${t(c.ended_at)}`
+    : `${c.started_on} ${t(c.started_at)} → ${c.ended_on} ${t(c.ended_at)}`;
+};
+const companionWhere = c => [
+  `${c.days}d`,
+  (c.cities || []).slice(0, 3).join(", ") || (c.countries || []).join(", ") || "no place in the archive",
+  (c.trips || [])[0],
+].filter(Boolean).join(" · ");
 // "parent" is the only directed edge kind: label it from the current person's side.
 const edgeKindLabel = (c, personId) => c.kind === "parent" ? (c.a === personId ? "parent of" : "child of") : c.kind;
 const initials = n => n.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
@@ -1199,7 +1215,7 @@ async function fetchAll(build) {
 }
 
 async function load() {
-  const [people, orgs, edges, affs, idents, facts, inter] = await Promise.all([
+  const [people, orgs, edges, affs, idents, facts, inter, comp] = await Promise.all([
     fetchAll(() => sb.from("person").select("*").order("full_name")),
     fetchAll(() => sb.from("orgs").select("id,name,kind,domain,city,country,note,parent_org_id").order("name")),
     fetchAll(() => sb.from("edges").select("a_id,b_id,kind,strength").order("a_id")),
@@ -1207,15 +1223,24 @@ async function load() {
     fetchAll(() => sb.from("identifiers").select("person_id,kind,value").order("person_id")),
     fetchAll(() => sb.from("facts").select("id,person_id,key,value,num,date").order("id")),
     fetchAll(() => sb.from("interactions").select("id,person_id,happened_on,channel,summary").order("happened_on", { ascending: false })),
+    // Optional integration: the location archive lives in another product, so a missing
+    // table is an empty block here and never a failed load.
+    CONFIG.locationCompanions
+      ? fetchAll(() => sb.from("location_v_companions")
+          .select("id,person_id,started_on,ended_on,has_time,tz,started_at,ended_at,note,days,cities,countries,trips")
+          .order("started_at", { ascending: false })).then(r => (r.error ? { data: [], error: null } : r))
+      : Promise.resolve({ data: [], error: null }),
   ]);
   for (const r of [people, orgs, edges, affs, idents, facts, inter]) if (r.error) throw new Error(r.error.message);
 
   const orgName = new Map(orgs.data.map(o => [o.id, o.name]));
   const push = (m, k, v) => { if (!m.has(k)) m.set(k, []); m.get(k).push(v); };
-  const identsBy = new Map(), factsBy = new Map(), affsBy = new Map(), interBy = new Map();
+  const identsBy = new Map(), factsBy = new Map(), affsBy = new Map(), interBy = new Map(),
+        compBy = new Map();
   idents.data.forEach(i => push(identsBy, i.person_id, i));
   facts.data.forEach(f => push(factsBy, f.person_id, f));
   inter.data.forEach(i => push(interBy, i.person_id, i));
+  (comp.data || []).forEach(c => push(compBy, c.person_id, c));
   affs.data.forEach(a => { a.org_name = orgName.get(a.org_id); push(affsBy, a.person_id, a); });
 
   DATA.people = people.data.map(p => ({
@@ -1226,6 +1251,7 @@ async function load() {
     lastContact: p.last_contact, days: p.days_since_contact,
     identifiers: identsBy.get(p.id) || [], facts: factsBy.get(p.id) || [],
     affiliations: affsBy.get(p.id) || [], interactions: interBy.get(p.id) || [],
+    companions: compBy.get(p.id) || [],
     _hay: norm([p.full_name, p.current_org, p.city, p.current_role, p.country, p.summary].filter(Boolean).join(" ")),
     _nname: norm(p.full_name),
   }));
@@ -2468,6 +2494,23 @@ function renderDrawer(p) {
         </div>
       </section>
 
+      ${!CONFIG.locationCompanions || p.kind === "agent" ? "" : `
+      <section class="blk"><h3>With me <em>${p.companions.length}</em></h3>
+        ${p.companions.length ? p.companions.map(c => `<div class="ia">
+            <time>${esc(companionWhen(c))}</time>
+            <div class="txt">${esc(companionWhere(c))}${c.note ? ` — ${esc(c.note)}` : ""}</div>
+            <span class="x" data-dc="${c.id}" style="opacity:.5">✕</span></div>`).join("")
+          : `<div class="none">no shared days recorded</div>`}
+        <div class="add">
+          <input type="date" id="cd0" style="max-width:132px" title="From">
+          <input type="date" id="cd1" style="max-width:132px" title="To, same day if left empty">
+          <input type="time" id="ct0" style="max-width:96px" title="From (optional)">
+          <input type="time" id="ct1" style="max-width:96px" title="To (optional)">
+          <input id="cn" placeholder="where you were is looked up, a note is optional">
+          <button class="btn btn-sm" id="addC">+</button>
+        </div>
+      </section>`}
+
       <section class="blk"><h3>Identifiers <em>${p.identifiers.length}</em></h3>
         ${p.identifiers.length ? p.identifiers.map(x => `<div class="row-item">
             <span class="lbl"><span class="k">${esc(x.kind)}</span> ${esc(x.value)}</span>
@@ -2581,6 +2624,8 @@ function renderDrawer(p) {
     chk(await sb.from("facts").delete().eq("id", +x.dataset.df)), "fact deleted"));
   d.querySelectorAll("[data-dx]").forEach(x => x.onclick = () => run(async () =>
     chk(await sb.from("interactions").delete().eq("id", +x.dataset.dx)), "interaction deleted"));
+  d.querySelectorAll("[data-dc]").forEach(x => x.onclick = () => run(async () =>
+    chk(await sb.from("location_companions").delete().eq("id", +x.dataset.dc)), "shared days removed"));
 
   $("addE").onclick = () => run(async () => {
     const t = pickPerson($("et").value, p.id);
@@ -2609,6 +2654,23 @@ function renderDrawer(p) {
     const value = $("iv").value.trim(); if (!value) throw new Error("Value is empty.");
     chk(await sb.from("identifiers").upsert({ person_id: p.id, kind: $("ik").value, value }));
   }, "identifier added");
+  if ($("addC")) $("addC").onclick = () => run(async () => {
+    const d0 = $("cd0").value; if (!d0) throw new Error("A start date at least.");
+    const d1 = $("cd1").value || d0;
+    const t0 = $("ct0").value, t1 = $("ct1").value;
+    if (d1 < d0) throw new Error("The end is before the start.");
+    if (!!t0 !== !!t1) throw new Error("Give both times, or neither.");
+    // The window is half-open and sent as wall clock with no timezone: the database reads
+    // that clock in the zone he was standing in, so a browser anywhere records the right
+    // hours. A day range therefore ends at midnight of the day after the last one.
+    const next = new Date(Date.parse(d1 + "T00:00:00Z") + 864e5).toISOString().slice(0, 10);
+    chk(await sb.from("location_companions").insert({
+      person_id: p.id, has_time: !!t0, note: $("cn").value.trim(),
+      started_at: t0 ? `${d0}T${t0}:00Z` : `${d0}T00:00:00Z`,
+      ended_at: t1 ? `${d1}T${t1}:00Z` : `${next}T00:00:00Z`,
+      source: "dashboard",
+    }));
+  }, "shared days recorded");
   $("addF").onclick = () => run(async () => {
     const key = $("fk").value.trim(); if (!key) throw new Error("Key is empty.");
     chk(await sb.from("facts").insert({ person_id: p.id, key, value: $("fv").value.trim() || null, source: "dashboard" }));
