@@ -68,6 +68,8 @@
   .btn-primary:hover{background:var(--accent2);border-color:var(--accent2);color:#17130A}
   .btn-ghost{background:transparent;border-color:transparent}
   .btn-ghost:hover{background:var(--surface2);border-color:var(--line)}
+  .btn.on,.btn-ghost.on{background:var(--accent);border-color:var(--accent);color:#17130A}
+  .btn.on:hover,.btn-ghost.on:hover{background:var(--accent2);border-color:var(--accent2);color:#17130A}
   .btn-sm{padding:4px 8px;font-size:12px;border-radius:var(--r-sm)}
   .btn-icon{padding:7px;width:32px;height:32px;justify-content:center}
   input[type=text],input[type=email],input[type=date],input:not([type]),select,textarea{
@@ -630,6 +632,9 @@
     <button class="btn btn-primary" id="newBtn" title="New person (⌘⇧N)">
       <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
       Person
+    </button>
+    <button class="btn btn-ghost btn-icon" id="treeBtn" title="Family tree view (T)">
+      <svg class="icon" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="4" rx="1"/><rect x="2" y="18" width="6" height="4" rx="1"/><rect x="16" y="18" width="6" height="4" rx="1"/><path d="M12 6v6M5 18v-3a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v3"/></svg>
     </button>
     <button class="btn btn-ghost btn-icon" id="gedBtn" title="Import a family tree (GEDCOM)">
       <svg class="icon" viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
@@ -1272,9 +1277,149 @@ function renderInsights() {
   $("insightsList").querySelectorAll("[data-goto]").forEach(a => a.onclick = () => goto(Number(a.dataset.goto)));
 }
 
+// ── family tree layout ────────────────────────────────────
+// The graph is a force simulation, which is the right answer for "who knows whom" and the wrong
+// one for a family, where the whole meaning is in the direction. Tree mode turns the simulation
+// off and pins every family on fixed generation rows, oldest at the top.
+//
+// Only the three kinds that carry a generation take part: "parent" moves one row down (a_id is
+// the parent), "sibling" and "partner" stay on the same row. The generic "family" kind is left
+// out of the layout on purpose — most of those edges are inferred from a shared WhatsApp group,
+// so putting a guessed generation on screen would be worse than leaving the person off it. They
+// still draw when both ends happen to be placed by their own links.
+const TREE_KINDS = new Set(["parent", "sibling", "partner"]);
+const TREE_ROW = 120;   // vertical distance between two generations, world units
+const TREE_COL = 76;    // horizontal distance between two people on the same row
+const TREE_GAP = 1.6;   // columns left between two couples/sibling sets on one row
+const TREE_PAD = 3.2;   // columns left between two separate trees
+const TREE_BUS = 34;    // how far above a child row the horizontal "bus" of a parent link runs
+
+/**
+ * Lays every family out on generation rows. Pure: takes the edge list, returns
+ * `Map(person id → {x, y, gen})` in world coordinates, centred on the origin. Anyone with no
+ * parent/sibling/partner edge is simply absent from the result.
+ */
+function famLayout(edges) {
+  const fam = edges.filter(e => TREE_KINDS.has(e.kind) && e.a !== e.b);
+  const ids = [], seen = new Set();
+  for (const e of fam) for (const id of [e.a, e.b]) if (!seen.has(id)) { seen.add(id); ids.push(id); }
+  const out = new Map();
+  if (!ids.length) return out;
+
+  // 1. one generation, one group: partners and siblings are merged so a couple is never split
+  //    across rows and never gets a stranger wedged between them.
+  const par = new Map(ids.map(id => [id, id]));
+  const find = x => { while (par.get(x) !== x) { par.set(x, par.get(par.get(x))); x = par.get(x); } return x; };
+  for (const e of fam) if (e.kind !== "parent") { const a = find(e.a), b = find(e.b); if (a !== b) par.set(a, b); }
+  const members = new Map();
+  for (const id of ids) { const r = find(id); if (!members.has(r)) members.set(r, []); members.get(r).push(id); }
+  const groups = [...members.keys()];
+  const gi = new Map(groups.map((g, i) => [g, i]));
+
+  // 2. parent edges lifted onto groups, deduplicated
+  const up = groups.map(() => []), down = groups.map(() => []), pe = new Set();
+  for (const e of fam) {
+    if (e.kind !== "parent") continue;
+    const a = gi.get(find(e.a)), b = gi.get(find(e.b));
+    if (a === b || pe.has(a + ":" + b)) continue;   // same group = a contradiction in the data, not a generation
+    pe.add(a + ":" + b);
+    down[a].push(b); up[b].push(a);
+  }
+
+  // 3. generation = longest path from the top. Relaxation rather than a topological sort, so a
+  //    cycle written by hand stretches the tree instead of hanging the page.
+  const gen = groups.map(() => 0);
+  for (let pass = 0; pass < groups.length; pass++) {
+    let moved = false;
+    for (let a = 0; a < groups.length; a++) for (const b of down[a]) if (gen[b] < gen[a] + 1) { gen[b] = gen[a] + 1; moved = true; }
+    if (!moved) break;
+  }
+
+  // 4. one component per family
+  const cp = groups.map((_, i) => i);
+  const cfind = x => { while (cp[x] !== x) { cp[x] = cp[cp[x]]; x = cp[x]; } return x; };
+  for (let a = 0; a < groups.length; a++) for (const b of down[a]) { const ra = cfind(a), rb = cfind(b); if (ra !== rb) cp[ra] = rb; }
+  const comps = new Map();
+  for (let i = 0; i < groups.length; i++) { const r = cfind(i); if (!comps.has(r)) comps.set(r, []); comps.get(r).push(i); }
+
+  const laid = [];
+  for (const list of comps.values()) {
+    const minGen = Math.min(...list.map(i => gen[i]));
+    // depth-first from the oldest groups gives an order where a family stays in one piece,
+    // which is a far better starting point for the sweeps below than the id order
+    const rows = [], visited = new Set(), stack = [];
+    const walk = root => {
+      stack.push(root);
+      while (stack.length) {
+        const i = stack.pop();
+        if (visited.has(i)) continue;
+        visited.add(i);
+        const g = gen[i] - minGen;
+        (rows[g] || (rows[g] = [])).push(i);
+        for (let k = down[i].length - 1; k >= 0; k--) stack.push(down[i][k]);
+      }
+    };
+    for (const i of list) if (!up[i].length) walk(i);
+    for (const i of list) walk(i);
+
+    // 5. barycentre sweeps, the standard crossing-reduction pass: a row is reordered so each
+    //    group sits under (then over) the average position of the groups it is linked to.
+    const pos = new Map();
+    const reindex = () => rows.forEach(r => r && r.forEach((g, k) => pos.set(g, k)));
+    reindex();
+    for (let s = 0; s < 6; s++) {
+      const downward = s % 2 === 0;
+      for (let r = 0; r < rows.length; r++) {
+        const row = rows[downward ? r : rows.length - 1 - r];
+        if (!row || row.length < 2) continue;
+        const keyed = row.map((g, k) => {
+          const rel = (downward ? up[g] : down[g]).map(o => pos.get(o)).filter(v => v !== undefined);
+          return { g, k, b: rel.length ? rel.reduce((x, y) => x + y, 0) / rel.length : k };
+        });
+        keyed.sort((p, q) => p.b - q.b || p.k - q.k);
+        row.length = 0; for (const x of keyed) row.push(x.g);
+      }
+      reindex();
+    }
+
+    // 6. columns. Each row is centred inside the component, so parents sit roughly over children.
+    const widths = rows.map(row => row
+      ? row.reduce((w, g) => w + members.get(groups[g]).length, 0) + (row.length - 1) * TREE_GAP : 0);
+    const w = Math.max(...widths, 1);
+    const cells = [];
+    rows.forEach((row, r) => {
+      if (!row) return;
+      let cur = (w - widths[r]) / 2;
+      for (const g of row) {
+        for (const id of members.get(groups[g])) { cells.push({ id, col: cur, row: r }); cur += 1; }
+        cur += TREE_GAP;
+      }
+    });
+    laid.push({ cells, w, h: rows.length });
+  }
+
+  // 7. trees packed left to right, wrapping onto a new shelf rather than running off into one
+  //    strip a mile wide — biggest family first, so his own tree opens the view.
+  laid.sort((a, b) => b.cells.length - a.cells.length || b.w - a.w);
+  const area = laid.reduce((s, c) => s + c.w * c.h * (TREE_ROW / TREE_COL), 0);
+  const shelfW = Math.max(...laid.map(c => c.w), Math.sqrt(area) * 1.5);
+  let sx = 0, sy = 0, shelfH = 0, maxX = 0;
+  for (const c of laid) {
+    if (sx > 0 && sx + c.w > shelfW) { sx = 0; sy += shelfH + 1.4; shelfH = 0; }
+    for (const cell of c.cells) out.set(cell.id, { x: (sx + cell.col) * TREE_COL, y: (sy + cell.row) * TREE_ROW, gen: cell.row });
+    sx += c.w + TREE_PAD; shelfH = Math.max(shelfH, c.h);
+    maxX = Math.max(maxX, sx - TREE_PAD);
+  }
+  // centre the whole thing on the origin, where the camera and the zoom controls expect it
+  const dx = maxX * TREE_COL / 2, dy = (sy + shelfH) * TREE_ROW / 2;
+  for (const p of out.values()) { p.x -= dx; p.y -= dy; }
+  return out;
+}
+
 // ── graph model ───────────────────────────────────────────
 let nodes = [], links = [], idx = new Map(), degree = [];
 let showIsolated = false, showOrgs = true, showLabels = true, colorByKind = false, showAgents = true;
+let treeMode = false;
 let orgFilter = "", tieFilter = new Set(ALL_TIES);
 let selected = null;
 let selectedOrgId = null;
@@ -1308,6 +1453,27 @@ function buildGraph() {
     return o ? add("o" + id, { type: "org", id, label: o.name, ref: o }) : -1;
   };
 
+  if (treeMode) {
+    // Only the people the layout could actually place, plus whoever was opened from the
+    // directory. Organizations are off: a company diamond means nothing in a genealogy.
+    const lay = famLayout(DATA.edges);
+    for (const id of lay.keys()) addP(id);
+    pinned.forEach(id => addP(id));
+    DATA.edges.forEach(e => {
+      const x = idx.get("p" + e.a), y = idx.get("p" + e.b);
+      if (x !== undefined && y !== undefined) links.push({ s: x, t: y, kind: e.kind, ea: e.a, eb: e.b });
+    });
+    // a person with no family link recorded gets a row of their own under the trees, rather
+    // than sitting at the origin on top of somebody's grandmother
+    const b = bounds([...lay.values()]);
+    let strayX = lay.size ? b.x0 : 0, strayY = lay.size ? b.y1 + TREE_ROW * 1.6 : 0;
+    for (const n of nodes) {
+      const p = lay.get(n.id);
+      n.fixed = true; n.vx = n.vy = 0;
+      if (p) { n.x = p.x; n.y = p.y; }
+      else { n.x = strayX; n.y = strayY; strayX += TREE_COL; }
+    }
+  } else {
   if (showIsolated) DATA.people.forEach(p => addP(p.id));
   else pinned.forEach(id => addP(id));
   if (showOrgs) {
@@ -1323,6 +1489,7 @@ function buildGraph() {
     });
   }
   DATA.edges.forEach(e => { const x = addP(e.a), y = addP(e.b); if (x >= 0 && y >= 0) links.push({ s: x, t: y, kind: e.kind, ea: e.a, eb: e.b }); });
+  }
 
   degree = new Array(nodes.length).fill(0);
   links.forEach(l => { degree[l.s]++; degree[l.t]++; });
@@ -1336,6 +1503,21 @@ function buildGraph() {
   links.forEach((l, i) => { neigh[l.s].push([l.t, i]); neigh[l.t].push([l.s, i]); });
 }
 let neigh = [];
+
+function setTreeMode(on) {
+  if (on && !DATA.edges.some(e => TREE_KINDS.has(e.kind))) {
+    toast("No family links yet — record a parent, sibling or partner first", "err");
+    return;
+  }
+  treeMode = on;
+  $("treeBtn").classList.toggle("on", on);
+  egoSet = null;
+  buildGraph();
+  renderActiveFilters();
+  if (on) { alpha = 0; invalidate(); }
+  else { reheat(1); prewarm(); }
+  fitView();
+}
 
 // ── force simulation (Barnes-Hut) ───────────────────────────────
 let alpha = 1, alphaTarget = 0;
@@ -1514,8 +1696,19 @@ function draw() {
   ctx.save();
   ctx.translate(W / 2, H / 2); ctx.scale(cam.k, cam.k); ctx.translate(-cam.x, -cam.y);
 
-  // links
-  ctx.lineCap = "round";
+  // links. In tree mode a parent link drops from the parent, runs along a horizontal bus just
+  // above the child row, then drops onto the child — so every child of one couple hangs off the
+  // same line and the whole thing reads as a tree instead of a fan of diagonals.
+  const linkPath = l => {
+    const a = nodes[l.s], b = nodes[l.t];
+    ctx.beginPath();
+    if (treeMode && l.kind === "parent" && b.y > a.y) {
+      const bus = b.y - TREE_BUS;
+      ctx.moveTo(a.x, a.y); ctx.lineTo(a.x, bus); ctx.lineTo(b.x, bus); ctx.lineTo(b.x, b.y);
+    } else { ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); }
+    ctx.stroke();
+  };
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
   for (let pass = 0; pass < 2; pass++) {
     for (const l of links) {
       const em = focus >= 0 && (l.s === focus || l.t === focus);
@@ -1533,7 +1726,7 @@ function draw() {
           : "rgba(150,158,175,.24)";
         ctx.lineWidth = 1 / cam.k;
       }
-      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      linkPath(l);
     }
   }
 
@@ -1618,7 +1811,7 @@ let dirty = true;
 const invalidate = () => { dirty = true; };
 function tick(now) {
   stepCam(now);
-  const running = alpha > ALPHA_MIN || dragNode;
+  const running = !treeMode && (alpha > ALPHA_MIN || dragNode);
   if (running) simStep();
   if (running || camAnim || dirty) { draw(); dirty = false; }
   requestAnimationFrame(tick);
@@ -1651,7 +1844,9 @@ function wireCanvas() {
   cv.addEventListener("pointerdown", e => {
     cv.setPointerCapture(e.pointerId);
     moved = 0; camAnim = null;
-    const i = nodeAt(e.clientX, e.clientY);
+    // a node cannot be dragged in tree mode: the row IS the information, so pulling someone out
+    // of their generation would be a lie on screen. The gesture pans instead.
+    const i = treeMode ? -1 : nodeAt(e.clientX, e.clientY);
     if (i >= 0) { dragNode = nodes[i]; dragNode.fixed = true; reheat(.32); }
     else pan = { sx: e.clientX, sy: e.clientY, cx: cam.x, cy: cam.y };
     cv.classList.add("grabbing");
@@ -1718,7 +1913,10 @@ let creating = false;
 
 function select(id, zoom = true) {
   selected = id; selectedOrgId = null; creating = false;
-  if (!idx.has("p" + id)) { pinned.add(id); buildGraph(); prewarm(220, 90); reheat(.22); }
+  if (!idx.has("p" + id)) {
+    pinned.add(id); buildGraph();
+    if (treeMode) invalidate(); else { prewarm(220, 90); reheat(.22); }
+  }
   const i = idx.get("p" + id);
   invalidate();
   renderDrawer(byId.get(id));
@@ -2435,12 +2633,14 @@ function renderActiveFilters() {
   if (orgFilter) chips.push(`<span class="chip">org <b>${esc(orgFilter)}</b><button data-clr="org">✕</button></span>`);
   if (tieFilter.size < ALL_TIES.length) chips.push(`<span class="chip">strength <b>${[...tieFilter].sort().map(t => t === "0" ? "—" : t).join(" ")}</b><button data-clr="tie">✕</button></span>`);
   if (egoSet) chips.push(`<span class="chip">isolated neighborhood<button data-clr="ego">✕</button></span>`);
+  if (treeMode) chips.push(`<span class="chip">family tree view<button data-clr="tree">✕</button></span>`);
   $("activeFilters").innerHTML = chips.join("");
   $("activeFilters").querySelectorAll("[data-clr]").forEach(b => b.onclick = () => {
     const k = b.dataset.clr;
     if (k === "org") orgFilter = "";
     if (k === "tie") tieFilter = new Set(ALL_TIES);
     if (k === "ego") { egoSet = null; fitView(); }
+    if (k === "tree") { setTreeMode(false); return; }
     renderFilters(); renderActiveFilters(); invalidate();
   });
 }
@@ -3058,8 +3258,10 @@ function wire() {
     invalidate();
   };
   $("showAgents").onchange = e => { showAgents = e.target.checked; buildGraph(); reheat(.5); };
+  $("treeBtn").onclick = () => setTreeMode(!treeMode);
   $("resetBtn").onclick = () => {
-    orgFilter = ""; tieFilter = new Set(ALL_TIES); egoSet = null;
+    orgFilter = ""; tieFilter = new Set(ALL_TIES); egoSet = null; treeMode = false;
+    $("treeBtn").classList.remove("on");
     showIsolated = false; showOrgs = showLabels = showAgents = true; colorByKind = false;
     $("showIsolated").checked = false;
     $("showOrgs").checked = $("showLabels").checked = $("showAgents").checked = true;
@@ -3118,6 +3320,7 @@ function wire() {
     if (e.key === "Escape") { pop.classList.remove("open"); statusPop.classList.remove("open"); insightsPop.classList.remove("open"); if (egoSet) { egoSet = null; renderActiveFilters(); invalidate(); } else closeDrawer(); }
     else if (e.key === "/" ) { e.preventDefault(); openPalette(); }
     else if (e.key === "f" || e.key === "F") { egoSet = null; renderActiveFilters(); fitView(); }
+    else if (e.key === "t" || e.key === "T") { e.preventDefault(); setTreeMode(!treeMode); }
     else if (e.key === "e" && selected != null) { e.preventDefault(); $("f_name")?.focus(); }
   });
 }

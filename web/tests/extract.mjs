@@ -91,6 +91,20 @@ const familySource = [
 
 export const { buildFamilyTree, famNodeHtml, edgeKindLabel, setData, setById } = new Function(familySource)();
 
+// The tree view is only worth having if a row really is a generation. `famLayout` is the whole of
+// that claim: get it wrong and the page shows a grandmother next to her grandson, confidently.
+const layoutSource = [
+  sliceStatement(html, "const TREE_KINDS = "),
+  sliceStatement(html, "const TREE_ROW = "),
+  sliceStatement(html, "const TREE_COL = "),
+  sliceStatement(html, "const TREE_GAP = "),
+  sliceStatement(html, "const TREE_PAD = "),
+  sliceFunction(html, "function famLayout("),
+  "return { famLayout, TREE_ROW, TREE_COL };",
+].join("\n");
+
+export const { famLayout, TREE_ROW, TREE_COL } = new Function(layoutSource)();
+
 // `pickPerson` is what stands between a typed name and a link written to the wrong person, which
 // is silent damage — no error, no visible difference, just an edge on the wrong record.
 const pickSource = [
