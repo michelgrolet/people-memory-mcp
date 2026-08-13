@@ -209,7 +209,7 @@ test("two organizations matched as one offer the same, and an empty one offers d
 });
 
 test("a merge is confirmed before it runs, and says what it is about to move", () => {
-  const ask = cleanConfirm({ op: "mp", name: "Ambroise Vantard", drop: [2], dropNames: ["A. Vantard"] });
+  const ask = cleanConfirm({ op: "mp", keep: 1, name: "Ambroise Vantard", drop: [2], dropNames: ["A. Vantard"] });
   assert.equal(ask.go, "Merge");
   assert.match(ask.text, /Ambroise Vantard/);
   assert.match(ask.text, /A\. Vantard/);
@@ -223,8 +223,18 @@ test("retyping a link and deleting one run on the click, without a confirmation"
   assert.equal(cleanConfirm({ op: "ed", kind: "family" }), null);
 });
 
+// Two records with the same name is the commonest duplicate there is, and it is exactly the case
+// where naming them is not enough to tell the reader which one survives.
+test("when both records carry the same name, the confirmation falls back to their ids", () => {
+  const same = cleanConfirm({ op: "mp", keep: 3618, name: "Anne Brugiere", drop: [3657], dropNames: ["Anne Brugiere"] });
+  assert.match(same.text, /Anne Brugiere #3618/);
+  assert.match(same.text, /Anne Brugiere #3657/);
+  const differ = cleanConfirm({ op: "mp", keep: 1, name: "Anne Brugiere", drop: [2], dropNames: ["Anne Marie Brugiere"] });
+  assert.ok(!differ.text.includes("#1"), "an id is noise when the names already differ");
+});
+
 test("a name in a confirmation is escaped before it reaches the page", () => {
-  const ask = cleanConfirm({ op: "mp", name: "<img src=x onerror=alert(1)>", drop: [2], dropNames: ["b"] });
+  const ask = cleanConfirm({ op: "mp", keep: 1, name: "<img src=x onerror=alert(1)>", drop: [2], dropNames: ["b"] });
   assert.ok(!ask.text.includes("<img"));
   assert.match(ask.text, /&lt;img/);
 });

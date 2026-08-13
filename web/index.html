@@ -1956,12 +1956,19 @@ function cleanBodyHtml(scan, pending) {
 // deleting one are a click, the way they already are in the drawer.
 function cleanConfirm(act) {
   const b = s => `<b>${esc(s)}</b>`;
-  if (act.op === "mp") return {
-    go: "Merge",
-    text: act.drop.length === 1
-      ? `Keep ${b(act.name)} and fold ${b(act.dropNames[0])} into it? Every link, fact, job and past conversation on the second one moves across, and an archived copy makes this recoverable.`
-      : `Keep ${b(act.name)} and fold the other ${act.drop.length} records into it? Everything they hold moves across, and an archived copy of each makes this recoverable.`,
-  };
+  if (act.op === "mp") {
+    // The commonest duplicate is the same name written twice, and "keep Anne Brugière and fold Anne
+    // Brugière into it" names neither record. When the names match, the id is what separates them,
+    // and it is the number written on the card the click came from.
+    const clash = act.dropNames.some(n => n === act.name);
+    const who = (name, id) => b(clash ? `${name} #${id}` : name);
+    return {
+      go: "Merge",
+      text: act.drop.length === 1
+        ? `Keep ${who(act.name, act.keep)} and fold ${who(act.dropNames[0], act.drop[0])} into it? Every link, fact, job and past conversation on the second one moves across, and an archived copy makes this recoverable.`
+        : `Keep ${who(act.name, act.keep)} and fold the other ${act.drop.length} records into it? Everything they hold moves across, and an archived copy of each makes this recoverable.`,
+    };
+  }
   if (act.op === "mo") return {
     go: "Merge",
     text: `Keep ${b(act.name)} and fold ${b(act.dropNames[0])} into it? Its members move across and everyone still filed under the old name is refiled.`,
