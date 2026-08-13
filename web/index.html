@@ -721,6 +721,83 @@
     .cl-cand b,.cl-cand .cl-meta{max-width:none;white-space:normal}
   }
 
+  /* ── merge window ────────────────────────────────────── */
+  /* Sits above the cleanup screen rather than replacing it: the merge is answered and the list is
+     still there underneath, with one line fewer. */
+  #mgScrim{
+    position:fixed;inset:0;z-index:98;background:rgba(6,7,9,.6);
+    opacity:0;pointer-events:none;transition:opacity 180ms var(--ease);
+  }
+  #mgScrim.open{opacity:1;pointer-events:auto}
+  #mgModal{
+    position:fixed;z-index:99;top:6vh;left:50%;width:min(1020px,calc(100% - 28px));max-height:min(84vh,840px);
+    transform:translate(-50%,-10px) scale(.985);opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line2);border-radius:var(--r-lg);
+    box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;
+    transition:opacity 180ms var(--ease),transform 220ms var(--ease);
+  }
+  #mgModal.open{opacity:1;transform:translate(-50%,0) scale(1);pointer-events:auto}
+  #mgModal .md-modal-head h4{flex:0 0 auto}
+  .mg-body{flex:1;overflow-y:auto;padding:14px 18px 20px}
+  .mg-foot-actions{display:flex;gap:8px}
+  /* Three columns, the result in the middle, so which value won is read across a row rather than
+     remembered between two screens. */
+  .mg-cols{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:12px;align-items:start}
+  .mg-side,.mg-mid{border:1px solid var(--line);border-radius:var(--r-md);background:var(--bg2);overflow:hidden}
+  .mg-mid{border-color:var(--accent);background:var(--surface2)}
+  .mg-head{padding:9px 11px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:5px}
+  .mg-mid .mg-head{border-bottom-color:var(--line2)}
+  .mg-head .t{font:600 12.5px/1.35 var(--font);color:var(--txt);word-break:break-word}
+  .mg-head .s{font:400 10px/1.4 var(--mono);color:var(--muted)}
+  .mg-keep{
+    align-self:flex-start;border:1px solid var(--line2);background:none;color:var(--muted);cursor:pointer;
+    font:600 10px/1 var(--font);padding:5px 8px;border-radius:999px;
+    transition:background 120ms var(--ease),color 120ms var(--ease),border-color 120ms var(--ease);
+  }
+  .mg-keep:hover{color:var(--txt2);border-color:var(--txt2)}
+  .mg-keep.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);cursor:default}
+  .mg-rows{padding:5px 0}
+  .mg-row{padding:5px 11px;display:flex;flex-direction:column;gap:2px}
+  .mg-row .k{font:500 9.5px/1.3 var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .mg-row .v{font-size:11.5px;line-height:1.45;color:var(--txt2);white-space:pre-wrap;word-break:break-word}
+  .mg-row .v.none{color:var(--muted);font-style:italic}
+  /* A value on a side column is a button only when taking it would change the result. */
+  .mg-take{
+    width:100%;text-align:left;border:1px solid transparent;background:none;cursor:pointer;
+    padding:5px 10px;border-radius:var(--r-sm);display:flex;flex-direction:column;gap:2px;
+    transition:background 120ms var(--ease),border-color 120ms var(--ease);
+  }
+  .mg-take:hover{background:var(--surface3);border-color:var(--line2)}
+  .mg-take .v{color:var(--txt)}
+  .mg-take::after{
+    content:"take this →";font:500 9.5px/1 var(--font);color:var(--accent);opacity:0;margin-top:2px;
+    transition:opacity 120ms var(--ease);
+  }
+  .mg-side:last-child .mg-take::after{content:"← take this"}
+  .mg-take:hover::after{opacity:1}
+  .mg-mid input,.mg-mid textarea{
+    width:100%;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-sm);
+    color:var(--txt);font:400 11.5px/1.45 var(--font);padding:5px 7px;
+  }
+  .mg-mid input:focus,.mg-mid textarea:focus{outline:none;border-color:var(--accent)}
+  .mg-mid textarea{resize:vertical;min-height:56px}
+  .mg-row.edited .k{color:var(--accent)}
+  .mg-extra{
+    margin-top:12px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--bg2);padding:10px 12px;
+  }
+  .mg-extra h6{font:600 11px/1.3 var(--font);color:var(--txt);margin:0 0 5px}
+  .mg-extra p{font-size:11.5px;line-height:1.55;color:var(--muted);margin:0}
+  .mg-extra b{color:var(--txt2);font-weight:600}
+  @media (max-width:820px){
+    #mgModal{top:0;left:0;transform:none;width:100%;height:100%;max-height:none;border-radius:0}
+    #mgModal.open{transform:none}
+    /* Stacked, the result goes first: on a phone it is the only column worth scrolling to. */
+    .mg-cols{grid-template-columns:1fr}
+    .mg-mid{order:-1}
+    .mg-side:last-child .mg-take::after{content:"take this ↑"}
+    .mg-take::after{content:"take this ↑"}
+  }
+
   /* ── sync status popover ─────────────────────────────── */
   .sync-row{display:flex;align-items:center;gap:9px;padding:8px 2px}
   .sync-row+.sync-row{border-top:1px solid var(--line)}
@@ -956,6 +1033,24 @@
   <div class="cl-foot">
     <span class="hint" id="cleanSkipped"></span>
     <button class="btn" id="cleanUnskip" hidden>Bring back what I skipped</button>
+  </div>
+</div>
+
+<div id="mgScrim"></div>
+<div id="mgModal" role="dialog" aria-modal="true" aria-labelledby="mgTitle">
+  <div class="md-modal-head">
+    <h4 id="mgTitle">Merge two records</h4>
+    <span class="cl-count" id="mgSub"></span>
+    <button class="btn btn-ghost btn-icon" id="mgClose" title="Close (esc)">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="mg-body" id="mgBody"></div>
+  <div class="cl-foot">
+    <span class="hint" id="mgHint"></span>
+    <div class="mg-foot-actions">
+      <button class="btn" id="mgCancel">Cancel</button>
+      <button class="btn btn-primary" id="mgGo">Merge</button>
+    </div>
   </div>
 </div>
 
@@ -1895,24 +1990,23 @@ function cleanBadge() {
   btn.title = total ? `Cleanup — ${total} to look at` : "Cleanup — nothing to fix";
 }
 
-// A duplicate is only repairable once somebody says which of the two records is the real one, so the
-// card that names a record is also the button that keeps it. Everything else on the row folds in.
-function cleanRefHtml(r, item) {
+function cleanRefHtml(r) {
   const attr = r.type === "org" ? "data-clean-org" : "data-clean-person";
-  const others = item && item.merge ? item.refs.filter(x => x.id !== r.id) : [];
-  const act = others.length ? {
-    op: item.merge === "org" ? "mo" : "mp", item: item.key,
-    keep: r.id, name: r.name,
-    drop: others.map(x => x.id), dropNames: others.map(x => x.name),
-  } : null;
   return `<div class="cl-cand">
     <button class="cl-cand-open" ${attr}="${r.id}" title="Open this record">
       <b>${esc(r.name)}</b>
       ${r.meta ? `<span class="cl-meta">${esc(r.meta)}</span>` : ""}
       ${r.meta2 ? `<span class="cl-meta"><em>${esc(r.meta2)}</em></span>` : ""}
     </button>
-    ${act ? `<button class="cl-keep" data-clean-act="${esc(JSON.stringify(act))}">Keep this one${act.drop.length > 1 ? `, fold in ${act.drop.length}` : ""}</button>` : ""}
   </div>`;
+}
+
+// A duplicate gets one button. Deciding which record survives, and what the surviving one ends up
+// holding, is not something to guess from a row in a list — it opens the merge window.
+function cleanItemActs(item) {
+  const acts = item.acts ? item.acts.slice() : [];
+  if (item.merge) acts.unshift({ label: "Merge", op: "mg", type: item.merge, ids: item.refs.map(r => r.id) });
+  return acts;
 }
 
 // Pure, so the markup this screen really ships can be rendered outside the browser — by a test, or
@@ -1931,14 +2025,15 @@ function cleanBodyHtml(scan, pending) {
       <p class="cl-why">${esc(s.why)}</p>
       ${s.items.map(i => {
         // While a row is asking "are you sure", every other way to act on it is taken away: the
-        // answer has to be the confirmation or the cancel, not a second merge started underneath.
+        // answer has to be the confirmation or the cancel, not a second repair started underneath.
         const asking = !!pending && pending.key === i.key;
+        const acts = cleanItemActs(i);
         return `
         <div class="cl-item">
           <div class="cl-main">
             ${i.headline ? `<div class="cl-line">${i.headline}</div>` : ""}
-            <div class="cl-cands" style="margin-top:${i.headline ? "6px" : "0"}">${i.refs.map(r => cleanRefHtml(r, asking ? null : i)).join("")}</div>
-            ${!asking && i.acts && i.acts.length ? `<div class="cl-acts">${i.acts.map(a =>
+            <div class="cl-cands" style="margin-top:${i.headline ? "6px" : "0"}">${i.refs.map(cleanRefHtml).join("")}</div>
+            ${!asking && acts.length ? `<div class="cl-acts">${acts.map(a =>
               `<button class="cl-act${a.danger ? " danger" : ""}" data-clean-act="${esc(JSON.stringify({ ...a, item: i.key }))}">${esc(a.label)}</button>`).join("")}</div>` : ""}
             ${asking ? `<div class="cl-confirm">
               <p>${pending.text}</p>
@@ -1952,27 +2047,10 @@ function cleanBodyHtml(scan, pending) {
     </section>`).join("");
 }
 
-// What a repair asks before it runs. Only the three that destroy a record ask; retyping a link and
-// deleting one are a click, the way they already are in the drawer.
+// What a repair asks before it runs. Only deleting asks here; retyping a link and deleting one are
+// a click, the way they already are in the drawer, and a merge asks in a window of its own.
 function cleanConfirm(act) {
   const b = s => `<b>${esc(s)}</b>`;
-  if (act.op === "mp") {
-    // The commonest duplicate is the same name written twice, and "keep Anne Brugière and fold Anne
-    // Brugière into it" names neither record. When the names match, the id is what separates them,
-    // and it is the number written on the card the click came from.
-    const clash = act.dropNames.some(n => n === act.name);
-    const who = (name, id) => b(clash ? `${name} #${id}` : name);
-    return {
-      go: "Merge",
-      text: act.drop.length === 1
-        ? `Keep ${who(act.name, act.keep)} and fold ${who(act.dropNames[0], act.drop[0])} into it? Every link, fact, job and past conversation on the second one moves across, and an archived copy makes this recoverable.`
-        : `Keep ${who(act.name, act.keep)} and fold the other ${act.drop.length} records into it? Everything they hold moves across, and an archived copy of each makes this recoverable.`,
-    };
-  }
-  if (act.op === "mo") return {
-    go: "Merge",
-    text: `Keep ${b(act.name)} and fold ${b(act.dropNames[0])} into it? Its members move across and everyone still filed under the old name is refiled.`,
-  };
   if (act.op === "do") return {
     go: "Delete",
     text: `Delete ${b(act.name)}? Nobody is affiliated to it. An archived copy makes this recoverable.`,
@@ -1984,11 +2062,6 @@ function cleanConfirm(act) {
 // cannot stop halfway and leave a record whose facts moved but whose links did not.
 async function cleanApply(act) {
   const chk = r => { if (r.error) throw new Error(r.error.message); return r; };
-  if (act.op === "mp" || act.op === "mo") {
-    const fn = act.op === "mp" ? "merge_people" : "merge_orgs";
-    for (const id of act.drop) chk(await sb.rpc(fn, { keep_id: act.keep, drop_id: id }));
-    return act.drop.length === 1 ? `${act.name} kept, the duplicate folded in` : `${act.name} kept, ${act.drop.length} duplicates folded in`;
-  }
   if (act.op === "do") {
     chk(await sb.rpc("delete_org", { p_id: act.org }));
     return `${act.name} deleted`;
@@ -2039,6 +2112,7 @@ function renderClean() {
   $("cleanBody").querySelectorAll("[data-clean-act]").forEach(el =>
     el.onclick = () => {
       const act = JSON.parse(el.dataset.cleanAct);
+      if (act.op === "mg") return openMergeModal(act.type, act.ids);
       const ask = cleanConfirm(act);
       if (!ask) return cleanRun(el, act);
       cleanPending = { key: act.item, act, text: ask.text, go: ask.go };
@@ -2079,6 +2153,239 @@ function wireCleanModal() {
     renderClean(); cleanBadge();
     await cleanSaveSkipped();
   };
+}
+
+// ── merge window ──────────────────────────────────────────
+// Two records side by side and the one they are about to become in the middle. The middle is the
+// only thing that survives the click, so it is editable: the graph is full of pairs where the right
+// answer is one record's name and the other's job, and picking a winner cannot express that.
+
+const MERGE_FIELDS_PERSON = [
+  { key: "name", col: "full_name", label: "Name", required: true },
+  { key: "birthdate", col: "birthdate", label: "Born", date: true },
+  { key: "city", col: "city", label: "City" },
+  { key: "country", col: "country", label: "Country" },
+  { key: "org", col: "current_org", label: "Organization" },
+  { key: "role", col: "current_role", label: "Role" },
+  { key: "linkedinUrl", col: "linkedin_url", label: "LinkedIn" },
+  { key: "metWhere", col: "met_where", label: "Met where" },
+  { key: "metWhen", col: "met_when", label: "Met when" },
+  { key: "tie", col: "tie_strength", label: "Closeness", num: [1, 5] },
+  { key: "summary", col: "summary", label: "Note", long: true },
+];
+const MERGE_FIELDS_ORG = [
+  { key: "name", col: "name", label: "Name", required: true },
+  { key: "kind", col: "kind", label: "Type" },
+  { key: "domain", col: "domain", label: "Domain" },
+  { key: "city", col: "city", label: "City" },
+  { key: "country", col: "country", label: "Country" },
+  { key: "note", col: "note", label: "Note", long: true },
+];
+const mergeFields = type => (type === "org" ? MERGE_FIELDS_ORG : MERGE_FIELDS_PERSON);
+const mergeVal = v => (v === null || v === undefined ? "" : String(v));
+
+// What the record becomes if nobody touches anything — the same rules `merge_people` applies on the
+// server, so the middle column is a preview and not a second opinion.
+function mergeProposal(fields, keep, drop) {
+  const out = {};
+  for (const f of fields) {
+    const k = mergeVal(keep[f.key]).trim(), d = mergeVal(drop[f.key]).trim();
+    if (f.num) out[f.key] = String(Math.max(Number(k) || 0, Number(d) || 0) || "");
+    else if (f.long) out[f.key] = !d ? k : !k ? d : (k === d ? k : `${k}\n\n${d}`);
+    else out[f.key] = k || d;
+  }
+  return out;
+}
+
+// The fuller record is the one that survives by default: it is the id already written on the most
+// links, and the one whose absence would be felt.
+function mergeWeight(r, links) {
+  return (links || 0) * 2 + (r.facts || []).length + (r.interactions || []).length
+    + (r.identifiers || []).length + (r.affiliations || []).length;
+}
+
+// Refused before the merge runs, never after: a merge that succeeds and then fails to write the
+// edits leaves a record holding values nobody chose.
+function mergeInvalid(fields, values) {
+  for (const f of fields) {
+    const v = mergeVal(values[f.key]).trim();
+    if (f.required && !v) return `${f.label} cannot be empty.`;
+    if (!v) continue;
+    if (f.date && !/^\d{4}-\d{2}-\d{2}$/.test(v)) return `${f.label} has to read YYYY-MM-DD, or be left empty.`;
+    if (f.num) {
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < f.num[0] || n > f.num[1]) return `${f.label} has to be a whole number from ${f.num[0]} to ${f.num[1]}, or be left empty.`;
+    }
+  }
+  return null;
+}
+
+function mergeRowsHtml(fields, rec, values, side) {
+  return fields.map(f => {
+    const v = mergeVal(rec[f.key]).trim();
+    const same = v === mergeVal(values[f.key]).trim();
+    const body = `<span class="k">${esc(f.label)}</span>
+      <span class="v${v ? "" : " none"}">${esc(v || "—")}</span>`;
+    // Only a value that would change the result is worth a click; the rest is there to be read.
+    return same || !v
+      ? `<div class="mg-row">${body}</div>`
+      : `<div class="mg-row"><button class="mg-take" data-mg-take="${side}|${esc(f.key)}" title="Use this value">${body}</button></div>`;
+  }).join("");
+}
+
+function mergeBodyHtml(state) {
+  const { type, keep, drop, values, touched } = state;
+  const fields = mergeFields(type);
+  const noun = type === "org" ? "organization" : "record";
+  const card = (rec, side) => `
+    <div class="mg-side">
+      <div class="mg-head">
+        <span class="t">${esc(rec.name)}</span>
+        <span class="s">#${rec.id}${rec.counts ? " · " + esc(rec.counts) : ""}</span>
+        <button class="mg-keep${rec.id === keep.id ? " on" : ""}" data-mg-keep="${rec.id}"
+          ${rec.id === keep.id ? "disabled" : ""}>${rec.id === keep.id ? "survives" : "let this one survive"}</button>
+      </div>
+      <div class="mg-rows">${mergeRowsHtml(fields, rec, values, side)}</div>
+    </div>`;
+  const mid = `
+    <div class="mg-mid">
+      <div class="mg-head">
+        <span class="t">${esc(mergeVal(values.name) || "—")}</span>
+        <span class="s">#${keep.id} · what it becomes</span>
+      </div>
+      <div class="mg-rows">${fields.map(f => `
+        <div class="mg-row${touched.includes(f.key) ? " edited" : ""}">
+          <span class="k">${esc(f.label)}</span>
+          ${f.long
+            ? `<textarea data-mg-field="${esc(f.key)}" rows="3">${esc(mergeVal(values[f.key]))}</textarea>`
+            : `<input data-mg-field="${esc(f.key)}" value="${esc(mergeVal(values[f.key]))}">`}
+        </div>`).join("")}
+      </div>
+    </div>`;
+  return `<div class="mg-cols">${card(state.left, "left")}${mid}${card(state.right, "right")}</div>
+    <div class="mg-extra">
+      <h6>What moves without asking</h6>
+      <p>${esc(state.extra)} Everything on the other ${noun} joins the one that survives, and a duplicate
+      of something it already holds is dropped rather than written twice. A full copy of the ${noun}
+      that goes is archived first, so this is recoverable.</p>
+    </div>`;
+}
+
+let mergeState = null;
+
+function openMergeModal(type, ids) {
+  const pool = type === "org" ? DATA.orgs : DATA.people;
+  const linkCount = id => DATA.edges.filter(e => e.a === id || e.b === id).length;
+  const members = id => DATA.affs.filter(a => a.org_id === id).length;
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+
+  const recs = ids.map(id => {
+    const r = pool.find(x => x.id === id);
+    if (!r) return null;
+    if (type === "org") return { ...r, counts: plural(members(id), "member") };
+    return {
+      ...r,
+      counts: [plural(linkCount(id), "link"), plural((r.facts || []).length, "fact"),
+        plural((r.interactions || []).length, "interaction")].join(" · "),
+      weight: mergeWeight(r, linkCount(id)),
+    };
+  }).filter(Boolean);
+  if (recs.length < 2) return toast("Those records are no longer there — reload", "err");
+
+  // More than two records share this detail. Two at a time, and the finding comes back for the rest.
+  const [left, right] = recs.slice(0, 2);
+  const keepFirst = type === "org"
+    ? members(left.id) >= members(right.id)
+    : (left.weight ?? 0) >= (right.weight ?? 0);
+  const keep = keepFirst ? left : right, drop = keepFirst ? right : left;
+
+  const extra = type === "org"
+    ? `${plural(members(left.id) + members(right.id), "membership")} across the two, and everyone still filed under the name that goes is refiled.`
+    : `${plural(linkCount(left.id) + linkCount(right.id), "link")}, ${plural((left.facts || []).length + (right.facts || []).length, "fact")}, ${plural((left.interactions || []).length + (right.interactions || []).length, "past conversation")} and every contact detail on either side.`;
+
+  mergeState = {
+    type, left, right, keep, drop, extra, touched: [],
+    values: mergeProposal(mergeFields(type), keep, drop),
+    rest: recs.length - 2,
+  };
+  $("mgScrim").classList.add("open"); $("mgModal").classList.add("open");
+  $("mgGo").disabled = false;
+  renderMerge();
+}
+
+function closeMergeModal() {
+  $("mgScrim").classList.remove("open"); $("mgModal").classList.remove("open");
+  mergeState = null;
+}
+
+function renderMerge() {
+  const s = mergeState;
+  if (!s) return;
+  $("mgTitle").textContent = s.type === "org" ? "Merge two organizations" : "Merge two records";
+  $("mgSub").textContent = s.rest ? `${s.rest} more share this — two at a time` : "";
+  $("mgHint").textContent = `#${s.drop.id} is archived, #${s.keep.id} survives`;
+  $("mgBody").innerHTML = mergeBodyHtml(s);
+
+  $("mgBody").querySelectorAll("[data-mg-keep]").forEach(el =>
+    el.onclick = () => {
+      const id = Number(el.dataset.mgKeep);
+      if (id === s.keep.id) return;
+      [s.keep, s.drop] = [s.drop, s.keep];
+      // What he typed himself outlives the swap; the rest follows the new survivor.
+      const fresh = mergeProposal(mergeFields(s.type), s.keep, s.drop);
+      for (const k of Object.keys(fresh)) if (!s.touched.includes(k)) s.values[k] = fresh[k];
+      renderMerge();
+    });
+  $("mgBody").querySelectorAll("[data-mg-take]").forEach(el =>
+    el.onclick = () => {
+      const [side, key] = el.dataset.mgTake.split("|");
+      s.values[key] = mergeVal(s[side][key]);
+      if (!s.touched.includes(key)) s.touched.push(key);
+      renderMerge();
+    });
+  $("mgBody").querySelectorAll("[data-mg-field]").forEach(el =>
+    el.oninput = () => {
+      const key = el.dataset.mgField;
+      s.values[key] = el.value;
+      if (!s.touched.includes(key)) { s.touched.push(key); el.closest(".mg-row").classList.add("edited"); }
+      if (key === "name") $("mgBody").querySelector(".mg-mid .mg-head .t").textContent = el.value || "—";
+    });
+}
+
+async function mergeRun() {
+  const s = mergeState;
+  if (!s) return;
+  const fields = mergeFields(s.type);
+  const bad = mergeInvalid(fields, s.values);
+  if (bad) return toast(bad, "err");
+
+  const chk = r => { if (r.error) throw new Error(r.error.message); return r; };
+  $("mgGo").disabled = true;
+  try {
+    chk(await sb.rpc(s.type === "org" ? "merge_orgs" : "merge_people", { keep_id: s.keep.id, drop_id: s.drop.id }));
+    // The server merged by its own rules; this writes back what is actually on screen, so what he
+    // read in the middle column is what the record holds.
+    const patch = {};
+    for (const f of fields) {
+      const v = mergeVal(s.values[f.key]).trim();
+      patch[f.col] = v === "" ? null : (f.num ? Number(v) : v);
+    }
+    chk(await sb.from(s.type === "org" ? "orgs" : "people").update(patch).eq("id", s.keep.id));
+    toast(`${mergeVal(s.values.name)} kept, the duplicate folded in`);
+    closeMergeModal();
+    await reload();
+    if (cleanOpen) renderClean();
+  } catch (e) {
+    $("mgGo").disabled = false;
+    toast(e.message || String(e), "err");
+  }
+}
+
+function wireMergeModal() {
+  $("mgClose").onclick = closeMergeModal;
+  $("mgCancel").onclick = closeMergeModal;
+  $("mgScrim").addEventListener("click", () => { if (mergeState) closeMergeModal(); });
+  $("mgGo").onclick = mergeRun;
 }
 
 // ── family tree layout ────────────────────────────────────
@@ -4342,6 +4649,7 @@ function wire() {
   wireGedModal();
   wireSkModal();
   wireCleanModal();
+  wireMergeModal();
 
   $("searchTrigger").onclick = () => openPalette();
   $("scrim").onclick = closePalette;
@@ -4439,7 +4747,9 @@ function wire() {
     if (cleanOpen) {
       if (e.key === "Escape") {
         e.preventDefault();
-        if (cleanPending) { cleanPending = null; renderClean(); } else closeCleanModal();
+        if (mergeState) closeMergeModal();
+        else if (cleanPending) { cleanPending = null; renderClean(); }
+        else closeCleanModal();
       }
       return;
     }

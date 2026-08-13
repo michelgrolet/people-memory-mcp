@@ -144,13 +144,39 @@ const cleanSource = [
   sliceFunction(html, "function cleanTokensSubset("),
   sliceFunction(html, "function cleanScan("),
   sliceFunction(html, "function cleanRefHtml("),
+  sliceFunction(html, "function cleanItemActs("),
   sliceFunction(html, "function cleanBodyHtml("),
   sliceFunction(html, "function cleanConfirm("),
-  "return { cleanFold, cleanOrgFold, cleanDomainFold, cleanTokensSubset, cleanScan, cleanBodyHtml, cleanConfirm };",
+  "return { cleanFold, cleanOrgFold, cleanDomainFold, cleanTokensSubset, cleanScan, cleanItemActs, cleanBodyHtml, cleanConfirm };",
 ].join("\n");
 
-export const { cleanFold, cleanOrgFold, cleanDomainFold, cleanTokensSubset, cleanScan, cleanBodyHtml, cleanConfirm } =
-  new Function(cleanSource)();
+export const {
+  cleanFold, cleanOrgFold, cleanDomainFold, cleanTokensSubset, cleanScan,
+  cleanItemActs, cleanBodyHtml, cleanConfirm,
+} = new Function(cleanSource)();
+
+// The merge window is the only place in the app where two records become one. `mergeProposal` has
+// to say exactly what `merge_people` will do on the server, and `mergeInvalid` has to catch a bad
+// value *before* the merge runs — after it, the record is already gone.
+const mergeSource = [
+  sliceStatement(html, "const esc = "),
+  sliceDeclaration(html, "const MERGE_FIELDS_PERSON = "),
+  sliceDeclaration(html, "const MERGE_FIELDS_ORG = "),
+  sliceStatement(html, "const mergeFields = "),
+  sliceStatement(html, "const mergeVal = "),
+  sliceFunction(html, "function mergeProposal("),
+  sliceFunction(html, "function mergeWeight("),
+  sliceFunction(html, "function mergeInvalid("),
+  sliceFunction(html, "function mergeRowsHtml("),
+  sliceFunction(html, "function mergeBodyHtml("),
+  `return {
+    MERGE_FIELDS_PERSON, MERGE_FIELDS_ORG, mergeFields, mergeProposal, mergeWeight,
+    mergeInvalid, mergeBodyHtml,
+  };`,
+].join("\n");
+
+export const { MERGE_FIELDS_PERSON, MERGE_FIELDS_ORG, mergeFields, mergeProposal, mergeWeight, mergeInvalid, mergeBodyHtml } =
+  new Function(mergeSource)();
 
 // The GEDCOM importer decides who is the same person as whom, so a regression here writes a
 // duplicate into the live graph. Same rule as above: run the shipped source, never a copy of it.

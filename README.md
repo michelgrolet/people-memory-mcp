@@ -235,10 +235,17 @@ The count on the button is what is waiting.
 
 It never decides anything, but every finding is repairable from the panel. Duplicate-looking records
 are routinely two real people — a son named after his father, three sisters given the same name — so
-each finding shows the records side by side with what separates them, and you pick which one is
-real: **Keep this one** folds the other into it, links, facts, jobs and past conversations included.
-A pair already linked to each other is left out entirely: the link is somebody having decided they
-differ, and a merge across a `parent`, `sibling` or `partner` link is refused by the database itself.
+each finding shows the records side by side with what separates them, and a pair already linked to
+each other is left out entirely: the link is somebody having decided they differ, and a merge across
+a `parent`, `sibling` or `partner` link is refused by the database itself.
+
+**Merge** opens a window with both records on the outside and the one they are about to become in
+the middle. The middle follows the same rules the server does — the survivor keeps its own values,
+inherits whatever it lacks, takes the closer of the two ratings, keeps both notes — and every field
+in it is editable, because the right answer is often one record's name and the other's job, which
+picking a winner cannot express. Clicking a value on either side takes it. Which record survives is
+a toggle, and switching it leaves whatever you typed alone. Nothing is written until you confirm.
+
 An empty organization is deleted in a click; a family link nobody classified is filed as parent,
 child, sibling or partner in a click, keeping the note that was on it; a parent link pointing at
 someone born before their own child is flipped in a click. **Not a problem** hides a finding for
