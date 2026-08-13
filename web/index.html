@@ -1696,7 +1696,7 @@ function renderDrawer(p) {
           <input type="range" id="f_tie" min="0" max="3" step="1" value="${p.tie || 0}" list="tieMarks"
             style="width:100%;accent-color:${tieColor(p.tie)}">
           <datalist id="tieMarks"><option value="0"></option><option value="1"></option><option value="2"></option><option value="3"></option></datalist>
-          <div class="tie-ticks" id="tieTicks">${[1, 2, 3].map(n => `<span${p.tie === n ? ' class="on"' : ""}>${TIE_LABEL[n]}</span>`).join("")}</div></div>
+          <div class="tie-ticks" id="tieTicks">${[0, 1, 2, 3].map(n => `<span${p.tie === n && n ? ' class="on"' : ""}>${n ? TIE_LABEL[n] : ""}</span>`).join("")}</div></div>
         <div class="grid2">
           <div class="fld"><label class="fl">Birth date${p.age != null ? ` <em class="fl-hint">${p.age} years old</em>` : ""}</label>
             <input type="date" id="f_bd" value="${v("birthdate")}"></div>
