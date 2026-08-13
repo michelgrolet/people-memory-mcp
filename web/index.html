@@ -743,7 +743,7 @@
         <i style="background:var(--t0)"></i><i style="background:var(--t1)"></i><i style="background:var(--t2)"></i>
         <i style="background:var(--t3)"></i>
       </span>
-      close
+      closest
     </div>
     <div class="row"><span class="dia" style="background:var(--org)"></span> organization</div>
     <div class="row"><span class="dash"></span> parent company</div>
@@ -878,7 +878,7 @@ const LINK_GROUPS = [
 // too vague to place anyone on a generation row.
 const FAMILY_KINDS = new Set(["parent", "sibling", "partner", "family"]);
 const CHANNELS = ["irl","call","whatsapp","email","linkedin","sms","visio"];
-const TIE_LABEL = {1:"acquaintance",2:"friend",3:"close"};
+const TIE_LABEL = {1:"friend",2:"close",3:"closest"};
 const TIE_COLOR = ["#4A4F5C","#8F8360","#C79C4E","#EDB13C"];
 const ALL_TIES = ["0", "1", "2", "3"];
 const ORG_COLOR = "#2DD4BF";
@@ -1250,7 +1250,7 @@ async function reload(keepId) {
 function renderStats() {
   const s = DATA.stats;
   $("stats").innerHTML = [
-    [s.people, "people"], [s.edges, "links"], [s.orgs, "orgs"], [s.close, "close"],
+    [s.people, "people"], [s.edges, "links"], [s.orgs, "orgs"], [s.close, "closest"],
   ].map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join("");
 }
 
