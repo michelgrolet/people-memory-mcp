@@ -1847,8 +1847,13 @@ function draw() {
   ctx.fillRect(0, 0, W, H);
   computeDim();
 
-  const selIdx = selected != null ? idx.get("p" + selected) : undefined;
-  const focus = hoverIdx >= 0 ? hoverIdx : (selIdx !== undefined ? selIdx : -1);
+  // the tree is somebody's tree, so whoever it is built around reads as selected even when the
+  // view was opened from the toolbar rather than from a person
+  const selIdx = selected != null ? idx.get("p" + selected)
+    : treeMode && treeRoot != null ? idx.get("p" + treeRoot) : undefined;
+  // a selection dims everything more than one hop away, which is the point on the network and
+  // wrong on the tree: the root would grey out its own great-grandparents. Hover still does it.
+  const focus = hoverIdx >= 0 ? hoverIdx : (!treeMode && selIdx !== undefined ? selIdx : -1);
   const near = new Set();
   if (focus >= 0) { near.add(focus); neigh[focus].forEach(([j]) => near.add(j)); }
 
