@@ -1114,7 +1114,7 @@ async function start(session) {
   started = true;
   $("login").hidden = true;
   $("app").hidden = false;
-  $("whoami").textContent = session.user.email;
+  $("whoami").textContent = myEmail = session.user.email;
   $("kbdHint").textContent = IS_MAC ? "⌘K" : "Ctrl K";
   try {
     await load();
@@ -1136,6 +1136,7 @@ async function start(session) {
 // ── data ──────────────────────────────────────────────────
 let DATA = { people: [], orgs: [], edges: [], affs: [], stats: {} };
 let byId = new Map();
+let myEmail = "";
 
 const PAGE_SIZE = 1000; // PostgREST defaults to 1,000 rows per request (db-max-rows).
 async function fetchAll(build) {
@@ -1341,6 +1342,46 @@ const TREE_PAD = 3.2;   // columns left between two separate trees
 const TREE_BUS = 34;    // how far above a child row the horizontal "bus" of a parent link runs
 
 /**
+ * One bloodline, never the whole graph. From a root person: every ancestor, every descendant, the
+ * root's own brothers and sisters, and the husband or wife of each of those — drawn as a leaf, with
+ * their own parents and siblings left out. That last rule is the whole point. With everyone on one
+ * page, Solange's brothers and sisters sat on the same rows as Michel's and the picture claimed a
+ * kinship that does not exist (his words, 2026-08-13: "imo we can't just show everyone on the same
+ * page"). Clicking that spouse re-roots the tree on their family instead.
+ *
+ * Pure: returns `{ ids, core }`, ids being everyone to place and core everyone who is there by
+ * blood. An edge is worth drawing only if it touches core — two people who both married in are not
+ * related to each other through this tree.
+ */
+function bloodline(edges, rootId) {
+  const core = new Set(), ids = new Set();
+  if (rootId == null) return { ids, core };
+  const up = new Map(), down = new Map(), sib = new Map(), mate = new Map();
+  const link = (m, k, v) => { const l = m.get(k); l ? l.push(v) : m.set(k, [v]); };
+  for (const e of edges) {
+    if (e.a === e.b) continue;
+    if (e.kind === "parent") { link(down, e.a, e.b); link(up, e.b, e.a); }
+    else if (e.kind === "sibling") { link(sib, e.a, e.b); link(sib, e.b, e.a); }
+    else if (e.kind === "partner") { link(mate, e.a, e.b); link(mate, e.b, e.a); }
+  }
+  // one shared visited set across both walks, so a person recorded as their own ancestor
+  // stretches the tree instead of looping forever
+  core.add(rootId);
+  const walk = (m) => {
+    const stack = [rootId];
+    while (stack.length) {
+      const i = stack.pop();
+      for (const j of m.get(i) || []) if (!core.has(j)) { core.add(j); stack.push(j); }
+    }
+  };
+  walk(up);
+  walk(down);
+  for (const s of sib.get(rootId) || []) core.add(s);   // brothers and sisters, not their children
+  for (const id of core) { ids.add(id); for (const m of mate.get(id) || []) ids.add(m); }
+  return { ids, core };
+}
+
+/**
  * Lays every family out on generation rows. Pure: takes the edge list, returns
  * `Map(person id → {x, y, gen})` in world coordinates, centred on the origin. Anyone with no
  * parent/sibling/partner edge is simply absent from the result.
@@ -1513,7 +1554,7 @@ function famLayout(edges) {
 // ── graph model ───────────────────────────────────────────
 let nodes = [], links = [], idx = new Map(), degree = [];
 let showIsolated = false, showOrgs = true, showLabels = true, colorByKind = false, showAgents = true;
-let treeMode = false;
+let treeMode = false, treeRoot = null;
 let orgFilter = "", tieFilter = new Set(ALL_TIES);
 let selected = null;
 let selectedOrgId = null;
@@ -1548,22 +1589,23 @@ function buildGraph() {
   };
 
   if (treeMode) {
-    // Only the people the layout could actually place, plus whoever was opened from the
-    // directory. Organizations are off: a company diamond means nothing in a genealogy.
-    const lay = famLayout(DATA.edges);
-    for (const id of lay.keys()) addP(id);
-    pinned.forEach(id => addP(id));
+    // One bloodline at a time, centred on `treeRoot`. Organizations are off: a company diamond
+    // means nothing in a genealogy.
+    const blood = bloodline(DATA.edges, treeRoot);
     // Only the three kinds that place a person also draw one. Everything else — a colleague
     // edge, or the generic "family" kind that ties two cousins together — is a long diagonal
     // across four generations, hiding the tree it crosses and saying nothing the rows don't
     // already say. His rule, 2026-08-13: "in the genealogy view, cousins should not have a link."
-    DATA.edges.forEach(e => {
-      if (!TREE_KINDS.has(e.kind)) return;
+    const treeEdges = DATA.edges.filter(e => TREE_KINDS.has(e.kind)
+      && blood.ids.has(e.a) && blood.ids.has(e.b)
+      && (blood.core.has(e.a) || blood.core.has(e.b)));
+    const lay = famLayout(treeEdges);
+    for (const id of lay.keys()) addP(id);
+    if (treeRoot != null) addP(treeRoot);   // no family recorded at all: still show them, alone
+    treeEdges.forEach(e => {
       const x = idx.get("p" + e.a), y = idx.get("p" + e.b);
       if (x !== undefined && y !== undefined) links.push({ s: x, t: y, kind: e.kind, ea: e.a, eb: e.b });
     });
-    // a person with no family link recorded gets a row of their own under the trees, rather
-    // than sitting at the origin on top of somebody's grandmother
     const b = bounds([...lay.values()]);
     let strayX = lay.size ? b.x0 : 0, strayY = lay.size ? b.y1 + TREE_ROW * 1.6 : 0;
     for (const n of nodes) {
@@ -1603,11 +1645,29 @@ function buildGraph() {
 }
 let neigh = [];
 
+/**
+ * Whose tree opens when nothing is selected: the account holder, matched on the signed-in email.
+ * Failing that, whoever has the most family links recorded — a wrong guess costs one click.
+ */
+function defaultTreeRoot() {
+  const me = myEmail.toLowerCase();
+  if (me) {
+    const hit = DATA.people.find(p => (p.identifiers || []).some(i => i.kind === "email" && (i.value || "").toLowerCase() === me));
+    if (hit) return hit.id;
+  }
+  const count = new Map();
+  for (const e of DATA.edges) if (TREE_KINDS.has(e.kind)) for (const id of [e.a, e.b]) count.set(id, (count.get(id) || 0) + 1);
+  let best = null, top = 0;
+  for (const [id, c] of count) if (c > top) { top = c; best = id; }
+  return best;
+}
+
 function setTreeMode(on) {
   if (on && !DATA.edges.some(e => TREE_KINDS.has(e.kind))) {
     toast("No family links yet — record a parent, sibling or partner first", "err");
     return;
   }
+  if (on) treeRoot = selected ?? defaultTreeRoot();
   treeMode = on;
   $("treeBtn").classList.toggle("on", on);
   egoSet = null;
@@ -1996,9 +2056,10 @@ function showTooltip(i, x, y) {
   const t = $("tooltip");
   if (i < 0) { t.classList.remove("on"); return; }
   const n = nodes[i];
-  t.innerHTML = n.type === "org"
-    ? `${esc(n.label)}<span class="m">organization</span>`
-    : `${esc(n.label)}<span class="m">${esc([n.ref.org, n.ref.city].filter(Boolean).join(" · ") || tieLabel(n.ref.tie))}</span>`;
+  const sub = n.type === "org" ? "organization"
+    : treeMode && n.id !== treeRoot ? "click to open their own tree"
+    : [n.ref.org, n.ref.city].filter(Boolean).join(" · ") || tieLabel(n.ref.tie);
+  t.innerHTML = `${esc(n.label)}<span class="m">${esc(sub)}</span>`;
   t.classList.add("on"); moveTooltip(x, y);
 }
 function moveTooltip(x, y) {
@@ -2012,7 +2073,11 @@ let creating = false;
 
 function select(id, zoom = true) {
   selected = id; selectedOrgId = null; creating = false;
-  if (!idx.has("p" + id)) {
+  // in the tree, opening someone means opening *their* tree: the spouse who was a leaf a second
+  // ago is now the root, with their own parents and siblings around them
+  const reroot = treeMode && id !== treeRoot;
+  if (reroot) { treeRoot = id; buildGraph(); renderActiveFilters(); }
+  else if (!idx.has("p" + id)) {
     pinned.add(id); buildGraph();
     if (treeMode) invalidate(); else { prewarm(220, 90); reheat(.22); }
   }
@@ -2020,7 +2085,8 @@ function select(id, zoom = true) {
   invalidate();
   renderDrawer(byId.get(id));
   openDrawer();
-  if (zoom && i !== undefined) {
+  if (zoom && reroot) fitView();
+  else if (zoom && i !== undefined) {
     const list = [nodes[i], ...neigh[i].map(([j]) => nodes[j])];
     fitTo(list, list.length > 1 ? 130 : 300);
   }
@@ -2767,7 +2833,10 @@ function renderActiveFilters() {
   if (orgFilter) chips.push(`<span class="chip">org <b>${esc(orgFilter)}</b><button data-clr="org">✕</button></span>`);
   if (tieFilter.size < ALL_TIES.length) chips.push(`<span class="chip">strength <b>${[...tieFilter].sort().map(t => t === "0" ? "—" : t).join(" ")}</b><button data-clr="tie">✕</button></span>`);
   if (egoSet) chips.push(`<span class="chip">isolated neighborhood<button data-clr="ego">✕</button></span>`);
-  if (treeMode) chips.push(`<span class="chip">family tree view<button data-clr="tree">✕</button></span>`);
+  if (treeMode) {
+    const root = treeRoot != null && byId.get(treeRoot);
+    chips.push(`<span class="chip">family of <b>${esc(root ? root.name : "—")}</b><button data-clr="tree">✕</button></span>`);
+  }
   $("activeFilters").innerHTML = chips.join("");
   $("activeFilters").querySelectorAll("[data-clr]").forEach(b => b.onclick = () => {
     const k = b.dataset.clr;
@@ -3394,7 +3463,7 @@ function wire() {
   $("showAgents").onchange = e => { showAgents = e.target.checked; buildGraph(); reheat(.5); };
   $("treeBtn").onclick = () => setTreeMode(!treeMode);
   $("resetBtn").onclick = () => {
-    orgFilter = ""; tieFilter = new Set(ALL_TIES); egoSet = null; treeMode = false;
+    orgFilter = ""; tieFilter = new Set(ALL_TIES); egoSet = null; treeMode = false; treeRoot = null;
     $("treeBtn").classList.remove("on");
     showIsolated = false; showOrgs = showLabels = showAgents = true; colorByKind = false;
     $("showIsolated").checked = false;

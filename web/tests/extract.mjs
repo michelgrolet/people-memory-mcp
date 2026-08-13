@@ -100,11 +100,12 @@ const layoutSource = [
   sliceStatement(html, "const TREE_GAP = "),
   sliceStatement(html, "const TREE_MATE_GAP = "),
   sliceStatement(html, "const TREE_PAD = "),
+  sliceFunction(html, "function bloodline("),
   sliceFunction(html, "function famLayout("),
-  "return { famLayout, TREE_ROW, TREE_COL };",
+  "return { bloodline, famLayout, TREE_ROW, TREE_COL };",
 ].join("\n");
 
-export const { famLayout, TREE_ROW, TREE_COL } = new Function(layoutSource)();
+export const { bloodline, famLayout, TREE_ROW, TREE_COL } = new Function(layoutSource)();
 
 // `pickPerson` is what stands between a typed name and a link written to the wrong person, which
 // is silent damage — no error, no visible difference, just an edge on the wrong record.

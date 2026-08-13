@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { famLayout, TREE_ROW, TREE_COL } from "./extract.mjs";
+import { bloodline, famLayout, TREE_ROW, TREE_COL } from "./extract.mjs";
 
 // The force graph can be wrong and still look fine — a spring is not a claim about anything.
 // A row in the tree view IS a claim: everyone on it belongs to the same generation. So these
@@ -111,6 +111,59 @@ test("the layout is centred on the origin, where the camera starts", () => {
   const mid = a => (Math.min(...a) + Math.max(...a)) / 2;
   assert.ok(Math.abs(mid(xs)) < 200, "horizontally centred");
   assert.ok(Math.abs(mid(ys)) < 200, "vertically centred");
+});
+
+// ── bloodline: who is even on the page ─────────────────────────────────────────────────────────
+// Scoping is the correctness question here, not the drawing: showing one person too many puts two
+// unrelated families on the same rows, which is exactly the picture he rejected.
+
+test("a spouse is drawn, their parents and siblings are not", () => {
+  //  1 = root, 10 = the spouse, 11/12 = the spouse's siblings, 13 = the spouse's father
+  const { ids, core } = bloodline([
+    partner(1, 10), sibling(10, 11), sibling(10, 12), parent(13, 10),
+  ], 1);
+  assert.deepEqual([...ids].sort((a, b) => a - b), [1, 10]);
+  assert.ok(core.has(1) && !core.has(10), "the spouse is a leaf, not blood");
+});
+
+test("every ancestor and every descendant comes in, over any number of generations", () => {
+  const { ids } = bloodline([
+    parent(1, 2), parent(2, 3), parent(3, 4),   // great-grandparent down to the root
+    parent(4, 5), parent(5, 6),                 // and the root's own line down
+  ], 4);
+  assert.deepEqual([...ids].sort((a, b) => a - b), [1, 2, 3, 4, 5, 6]);
+});
+
+test("brothers and sisters are in, their children are not", () => {
+  // 2 is the root's sibling, 20 is 2's child — a nephew is not on this tree
+  const { ids } = bloodline([sibling(1, 2), parent(2, 20)], 1);
+  assert.deepEqual([...ids].sort((a, b) => a - b), [1, 2]);
+});
+
+test("an uncle and a cousin never reach the page", () => {
+  // 1 root, 2 root's father, 3 father's brother (uncle), 4 the uncle's child (cousin)
+  const { ids } = bloodline([parent(2, 1), sibling(2, 3), parent(3, 4)], 1);
+  assert.ok(!ids.has(3) && !ids.has(4), "the uncle's branch stays out");
+  assert.deepEqual([...ids].sort((a, b) => a - b), [1, 2]);
+});
+
+test("two people who both married in are never linked to each other", () => {
+  // 1 and 2 are siblings, 10 and 20 their respective spouses: 10 and 20 are strangers
+  const edges = [sibling(1, 2), partner(1, 10), partner(2, 20)];
+  const { ids, core } = bloodline(edges, 1);
+  const drawn = edges.filter(e => ids.has(e.a) && ids.has(e.b) && (core.has(e.a) || core.has(e.b)));
+  assert.equal(drawn.length, 3);
+  assert.ok(!drawn.some(e => !core.has(e.a) && !core.has(e.b)));
+});
+
+test("no root, or a root with nothing recorded, does not throw", () => {
+  assert.equal(bloodline([parent(1, 2)], null).ids.size, 0);
+  assert.deepEqual([...bloodline([parent(1, 2)], 99).ids], [99]);
+});
+
+test("a person recorded as their own ancestor does not hang the page", () => {
+  const { ids } = bloodline([parent(1, 2), parent(2, 3), parent(3, 1)], 1);
+  assert.ok(ids.has(1) && ids.size <= 3);
 });
 
 test("a big tree stays fast enough to build on every toggle", () => {
