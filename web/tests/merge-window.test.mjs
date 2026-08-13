@@ -135,3 +135,15 @@ test("a name typed by a human is escaped everywhere the window prints it", () =>
   assert.equal((html.match(/<\/textarea>/g) || []).length, (html.match(/<textarea/g) || []).length);
   assert.ok(html.includes("&lt;/textarea&gt;"), "the name is escaped, not stripped");
 });
+
+// Three columns are only worth having if City sits opposite City. The rows are laid out by the
+// outer grid, which has to be told how many there are.
+test("the window declares one grid row per field, plus the header", () => {
+  const html = mergeBodyHtml(state());
+  assert.match(html, new RegExp(`--mg-rows:${MERGE_FIELDS_PERSON.length + 1}`));
+  const cols = html.match(/class="mg-(side|mid)"/g) || [];
+  assert.equal(cols.length, 3);
+  // Every column carries the same number of rows, or they cannot share them.
+  for (const col of html.split(/(?=<div class="mg-(?:side|mid)")/).slice(1))
+    assert.equal((col.match(/class="mg-row/g) || []).length, MERGE_FIELDS_PERSON.length);
+});

@@ -741,10 +741,20 @@
   .mg-body{flex:1;overflow-y:auto;padding:14px 18px 20px}
   .mg-foot-actions{display:flex;gap:8px}
   /* Three columns, the result in the middle, so which value won is read across a row rather than
-     remembered between two screens. */
-  .mg-cols{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:12px;align-items:start}
+     remembered between two screens. That only works if the three columns agree on where a row
+     starts: an input is taller than the line of text beside it, so after two fields the columns have
+     drifted and "read across" stops meaning anything. `subgrid` makes every column share the outer
+     grid's rows, so City sits opposite City however tall either side turns out to be. */
+  .mg-cols{display:grid;grid-template-columns:1fr 1.15fr 1fr;gap:0 12px;align-items:start}
   .mg-side,.mg-mid{border:1px solid var(--line);border-radius:var(--r-md);background:var(--bg2);overflow:hidden}
   .mg-mid{border-color:var(--accent);background:var(--surface2)}
+  @supports (grid-template-rows: subgrid){
+    .mg-cols{grid-template-rows:repeat(var(--mg-rows,12),auto)}
+    .mg-side,.mg-mid{display:grid;grid-row:1 / -1;grid-template-rows:subgrid}
+    .mg-row{align-content:start}
+    .mg-side>.mg-row:last-child,.mg-mid>.mg-row:last-child{padding-bottom:10px}
+    .mg-side>.mg-row:first-of-type,.mg-mid>.mg-row:first-of-type{padding-top:9px}
+  }
   .mg-head{padding:9px 11px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:5px}
   .mg-mid .mg-head{border-bottom-color:var(--line2)}
   .mg-head .t{font:600 12.5px/1.35 var(--font);color:var(--txt);word-break:break-word}
@@ -756,7 +766,6 @@
   }
   .mg-keep:hover{color:var(--txt2);border-color:var(--txt2)}
   .mg-keep.on{background:var(--accent-dim);border-color:var(--accent);color:var(--accent);cursor:default}
-  .mg-rows{padding:5px 0}
   .mg-row{padding:5px 11px;display:flex;flex-direction:column;gap:2px}
   .mg-row .k{font:500 9.5px/1.3 var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
   .mg-row .v{font-size:11.5px;line-height:1.45;color:var(--txt2);white-space:pre-wrap;word-break:break-word}
@@ -2245,7 +2254,7 @@ function mergeBodyHtml(state) {
         <button class="mg-keep${rec.id === keep.id ? " on" : ""}" data-mg-keep="${rec.id}"
           ${rec.id === keep.id ? "disabled" : ""}>${rec.id === keep.id ? "survives" : "let this one survive"}</button>
       </div>
-      <div class="mg-rows">${mergeRowsHtml(fields, rec, values, side)}</div>
+      ${mergeRowsHtml(fields, rec, values, side)}
     </div>`;
   const mid = `
     <div class="mg-mid">
@@ -2253,16 +2262,16 @@ function mergeBodyHtml(state) {
         <span class="t">${esc(mergeVal(values.name) || "—")}</span>
         <span class="s">#${keep.id} · what it becomes</span>
       </div>
-      <div class="mg-rows">${fields.map(f => `
+      ${fields.map(f => `
         <div class="mg-row${touched.includes(f.key) ? " edited" : ""}">
           <span class="k">${esc(f.label)}</span>
           ${f.long
             ? `<textarea data-mg-field="${esc(f.key)}" rows="3">${esc(mergeVal(values[f.key]))}</textarea>`
             : `<input data-mg-field="${esc(f.key)}" value="${esc(mergeVal(values[f.key]))}">`}
         </div>`).join("")}
-      </div>
     </div>`;
-  return `<div class="mg-cols">${card(state.left, "left")}${mid}${card(state.right, "right")}</div>
+  // One row per field plus the header, declared to the grid so the three columns share them.
+  return `<div class="mg-cols" style="--mg-rows:${fields.length + 1}">${card(state.left, "left")}${mid}${card(state.right, "right")}</div>
     <div class="mg-extra">
       <h6>What moves without asking</h6>
       <p>${esc(state.extra)} Everything on the other ${noun} joins the one that survives, and a duplicate
