@@ -233,11 +233,21 @@ belongs to, links that cannot all be true (someone their own ancestor, a parent 
 child, a pair filed as both parent and sibling), and family links still too vague for the tree.
 The count on the button is what is waiting.
 
-It never merges anything. Duplicate-looking records are routinely two real people — a son named
-after his father, three sisters given the same name — so each finding opens the records side by
-side with what separates them, and the decision stays yours. A pair already linked to each other
-is left out entirely: the link is somebody having decided they differ. **Not a problem** hides a
-finding for good, stored with the owner's own settings so the list drains instead of nagging.
+It never decides anything, but every finding is repairable from the panel. Duplicate-looking records
+are routinely two real people — a son named after his father, three sisters given the same name — so
+each finding shows the records side by side with what separates them, and you pick which one is
+real: **Keep this one** folds the other into it, links, facts, jobs and past conversations included.
+A pair already linked to each other is left out entirely: the link is somebody having decided they
+differ, and a merge across a `parent`, `sibling` or `partner` link is refused by the database itself.
+An empty organization is deleted in a click; a family link nobody classified is filed as parent,
+child, sibling or partner in a click, keeping the note that was on it; a parent link pointing at
+someone born before their own child is flipped in a click. **Not a problem** hides a finding for
+good, stored with the owner's own settings so the list drains instead of nagging.
+
+A merge moves rows across five tables, so it runs as one Postgres function rather than a series of
+calls from the browser: it cannot stop halfway and leave a record whose facts moved but whose links
+did not. The losing record is archived into `deleted_records` in full — with the id it was merged
+into — before anything moves, so every merge is recoverable.
 
 ### Shared days, if you also keep a location archive
 

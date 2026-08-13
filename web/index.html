@@ -646,12 +646,41 @@
   .cl-item+.cl-item{margin-top:7px}
   .cl-main{flex:1;min-width:0}
   .cl-cands{display:flex;flex-wrap:wrap;gap:7px}
+  /* the card is a container, not a control: it holds the button that opens the record and, when the
+     finding is a duplicate, the button that keeps this one and absorbs the other */
   .cl-cand{
-    display:flex;flex-direction:column;gap:2px;text-align:left;padding:6px 10px;min-width:0;
+    display:flex;flex-direction:column;min-width:0;overflow:hidden;
     background:var(--surface2);border:1px solid var(--line);border-radius:var(--r-sm);
-    cursor:pointer;transition:background 120ms var(--ease),border-color 120ms var(--ease);
+    transition:border-color 120ms var(--ease);
   }
-  .cl-cand:hover{background:var(--surface3);border-color:var(--line2)}
+  .cl-cand:hover{border-color:var(--line2)}
+  .cl-cand-open{
+    display:flex;flex-direction:column;gap:2px;text-align:left;padding:6px 10px;min-width:0;
+    background:none;border:none;cursor:pointer;transition:background 120ms var(--ease);
+  }
+  .cl-cand-open:hover{background:var(--surface3)}
+  .cl-keep{
+    border:none;border-top:1px solid var(--line);background:none;color:var(--accent);text-align:left;
+    font:600 10.5px/1 var(--font);padding:7px 10px;cursor:pointer;white-space:nowrap;
+    transition:background 120ms var(--ease);
+  }
+  .cl-keep:hover{background:var(--accent-dim)}
+  .cl-acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+  .cl-act{
+    border:1px solid var(--line);background:var(--surface2);color:var(--txt2);white-space:nowrap;
+    font:500 11px/1 var(--font);padding:6px 9px;border-radius:var(--r-sm);cursor:pointer;
+    transition:background 120ms var(--ease),border-color 120ms var(--ease),color 120ms var(--ease);
+  }
+  .cl-act:hover{background:var(--surface3);border-color:var(--line2);color:var(--txt)}
+  .cl-act.danger:hover{color:var(--red);border-color:var(--red)}
+  /* a merge moves rows on five tables; the row it starts from says so, and stops answering clicks */
+  .cl-item.busy{opacity:.45;pointer-events:none}
+  .cl-confirm{
+    margin-top:8px;padding:8px 10px;border:1px solid var(--accent);border-radius:var(--r-sm);
+    background:var(--accent-dim);display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  }
+  .cl-confirm p{flex:1;min-width:210px;font-size:11.5px;line-height:1.5;color:var(--txt2);margin:0}
+  .cl-confirm b{color:var(--txt);font-weight:600}
   .cl-cand b{
     font:600 12.5px/1.35 var(--font);color:var(--txt);
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:36ch;
@@ -1612,9 +1641,10 @@ function cleanScan(data, skipped) {
       byIdent.get(k).ids.add(p.id);
     }
   section("dup-ident", "One contact detail, two records",
-    "The same address or number is written on both. Open each one, keep the fuller record, move anything the other holds onto it.",
+    "The same address or number is written on both. Keep the fuller record and the other one folds into it: its links, facts, jobs and past conversations all move over.",
     live([...byIdent.entries()].filter(([, g]) => g.ids.size > 1).map(([k, g]) => ({
       key: `ident:${k}`,
+      merge: "person",
       headline: `${plural(g.ids.size, "record")} share the ${g.kind} <b>${esc(g.value)}</b>`,
       refs: [...g.ids].map(personRef),
     }))));
@@ -1633,7 +1663,7 @@ function cleanScan(data, skipped) {
     for (let i = 0; i < ids.length; i++)
       for (let j = i + 1; j < ids.length; j++)
         if (!linked.has(pairKey(ids[i], ids[j])))
-          namePairs.push({ key: `name:${pairKey(ids[i], ids[j])}`, refs: [personRef(ids[i]), personRef(ids[j])] });
+          namePairs.push({ key: `name:${pairKey(ids[i], ids[j])}`, merge: "person", refs: [personRef(ids[i]), personRef(ids[j])] });
   }
   section("dup-name", "The same name, twice",
     "Spelled identically once case, accents and punctuation are set aside. Pairs already linked to each other are left out — a link means somebody has decided they are two people.",
@@ -1656,7 +1686,7 @@ function cleanScan(data, skipped) {
         if (a.fold === b.fold) continue; // already reported above as an exact match
         if (linked.has(pairKey(a.id, b.id))) continue;
         if (!cleanTokensSubset(a.t, b.t) && !cleanTokensSubset(b.t, a.t)) continue;
-        nearPairs.push({ key: `near:${pairKey(a.id, b.id)}`, refs: [personRef(a.id), personRef(b.id)] });
+        nearPairs.push({ key: `near:${pairKey(a.id, b.id)}`, merge: "person", refs: [personRef(a.id), personRef(b.id)] });
       }
   }
   section("dup-near", "Almost the same name",
@@ -1673,7 +1703,7 @@ function cleanScan(data, skipped) {
           const a = orgs.find(o => o.id === list[i]), b = orgs.find(o => o.id === list[j]);
           if (a.parent_org_id === b.id || b.parent_org_id === a.id) continue;
           const k = pairKey(list[i], list[j]);
-          if (!orgPairs.has(k)) orgPairs.set(k, { key: `org:${k}`, reasons: [], refs: [orgRef(list[i]), orgRef(list[j])] });
+          if (!orgPairs.has(k)) orgPairs.set(k, { key: `org:${k}`, merge: "org", reasons: [], refs: [orgRef(list[i]), orgRef(list[j])] });
           orgPairs.get(k).reasons.push(reason);
         }
     }
@@ -1695,14 +1725,30 @@ function cleanScan(data, skipped) {
   section("org-empty", "Organizations with nobody in them",
     "No member and no subsidiary. Usually a name typed twice, or the losing half of a merge already done by hand.",
     live(orgs.filter(o => !orgMembers.get(o.id) && !orgs.some(x => x.parent_org_id === o.id))
-      .map(o => ({ key: `orgempty:${o.id}`, headline: "Nobody is affiliated to it", refs: [orgRef(o.id)] }))));
+      .map(o => ({
+        key: `orgempty:${o.id}`, headline: "Nobody is affiliated to it", refs: [orgRef(o.id)],
+        acts: [{ label: "Delete it", op: "do", org: o.id, name: o.name, danger: true }],
+      }))));
 
   // 6 — links that cannot all be true at once.
   const broken = [];
+  // A first name is what tells two family records apart on a button; when both carry the same one,
+  // only the full name does.
+  const shortName = (id, other) => {
+    const p = pById.get(id), q = pById.get(other);
+    if (!p) return `#${id}`;
+    const first = p.name.trim().split(/\s+/)[0];
+    if (q && q.name.trim().split(/\s+/)[0] === first) return p.name;
+    return first;
+  };
+  const delAct = (a, b, kind, label) => ({ label: label || `Delete the ${kind} link`, op: "ed", a, b, kind, danger: true });
   const seenEdge = new Map(), pairKinds = new Map(), parentsOfId = new Map();
   for (const e of edges) {
     if (e.a === e.b) {
-      broken.push({ key: `self:${e.a}:${e.kind}`, headline: `Linked to themselves as <b>${esc(e.kind)}</b>`, refs: [personRef(e.a)] });
+      broken.push({
+        key: `self:${e.a}:${e.kind}`, headline: `Linked to themselves as <b>${esc(e.kind)}</b>`,
+        refs: [personRef(e.a)], acts: [delAct(e.a, e.b, e.kind, "Delete the link")],
+      });
       continue;
     }
     const pk = pairKey(e.a, e.b);
@@ -1726,7 +1772,11 @@ function cleanScan(data, skipped) {
     const clash = [...kinds].filter(k => k === "sibling" || k === "partner");
     if (!clash.length) continue;
     const [a, b] = pk.split("+").map(Number);
-    broken.push({ key: `clash:${pk}`, headline: `Linked as <b>parent</b> and as <b>${esc(clash.join(", "))}</b>`, refs: [personRef(a), personRef(b)] });
+    broken.push({
+      key: `clash:${pk}`, headline: `Linked as <b>parent</b> and as <b>${esc(clash.join(", "))}</b>`,
+      refs: [personRef(a), personRef(b)],
+      acts: [delAct(a, b, "parent"), ...clash.map(k => delAct(a, b, k))],
+    });
   }
   for (const [child, parents] of parentsOfId) {
     if (parents.length > 2)
@@ -1742,6 +1792,13 @@ function cleanScan(data, skipped) {
           key: `gap:${par}+${child}`,
           headline: pc < pp ? "Born before their own parent" : `Only ${pc - pp} years apart`,
           refs: [personRef(par), personRef(child)],
+          acts: [
+            // Born before their own parent is the link written backwards nine times in ten, so the
+            // repair is offered first. Too small a gap is usually two records that should be one,
+            // and that is not something a button on this row can decide.
+            ...(pc < pp ? [{ label: `Flip it — ${shortName(child, par)} is the parent`, op: "ek", a: par, b: child, old: "parent", kind: "parent", swap: true }] : []),
+            delAct(par, child, "parent"),
+          ],
         });
     }
   }
@@ -1790,6 +1847,15 @@ function cleanScan(data, skipped) {
       key: `vague:${pairKey(e.a, e.b)}`,
       headline: e.note ? `Noted: <b>${esc(e.note)}</b>` : "No note says which way it runs",
       refs: [personRef(e.a), personRef(e.b)],
+      // One click each, and the note that was already on the link is carried onto the new one — the
+      // note is usually the only record of why anybody drew it.
+      acts: [
+        { label: `${shortName(e.a, e.b)} is the parent`, op: "ek", a: e.a, b: e.b, old: "family", kind: "parent", swap: false },
+        { label: `${shortName(e.b, e.a)} is the parent`, op: "ek", a: e.a, b: e.b, old: "family", kind: "parent", swap: true },
+        { label: "Siblings", op: "ek", a: e.a, b: e.b, old: "family", kind: "sibling" },
+        { label: "Partners", op: "ek", a: e.a, b: e.b, old: "family", kind: "partner" },
+        delAct(e.a, e.b, "family", "Delete the link"),
+      ],
     }))));
 
   const total = sections.reduce((n, s) => n + s.items.length, 0);
@@ -1799,6 +1865,9 @@ function cleanScan(data, skipped) {
 // ── cleanup: the overlay ──────────────────────────────────
 let cleanSkipped = new Set();
 let cleanOpen = false;
+// The one repair waiting on a yes. Held here rather than in the DOM so that a re-render — which a
+// repair triggers on the row next to it — cannot leave a half-answered question on screen.
+let cleanPending = null;
 
 // A skip is a decision about the graph, not about this browser: it survives a reload and reaches
 // the phone. app_settings already holds the owner's own settings under the same owner-only policy,
@@ -1826,18 +1895,31 @@ function cleanBadge() {
   btn.title = total ? `Cleanup — ${total} to look at` : "Cleanup — nothing to fix";
 }
 
-function cleanRefHtml(r) {
+// A duplicate is only repairable once somebody says which of the two records is the real one, so the
+// card that names a record is also the button that keeps it. Everything else on the row folds in.
+function cleanRefHtml(r, item) {
   const attr = r.type === "org" ? "data-clean-org" : "data-clean-person";
-  return `<button class="cl-cand" ${attr}="${r.id}" title="Open this record">
-    <b>${esc(r.name)}</b>
-    ${r.meta ? `<span class="cl-meta">${esc(r.meta)}</span>` : ""}
-    ${r.meta2 ? `<span class="cl-meta"><em>${esc(r.meta2)}</em></span>` : ""}
-  </button>`;
+  const others = item && item.merge ? item.refs.filter(x => x.id !== r.id) : [];
+  const act = others.length ? {
+    op: item.merge === "org" ? "mo" : "mp", item: item.key,
+    keep: r.id, name: r.name,
+    drop: others.map(x => x.id), dropNames: others.map(x => x.name),
+  } : null;
+  return `<div class="cl-cand">
+    <button class="cl-cand-open" ${attr}="${r.id}" title="Open this record">
+      <b>${esc(r.name)}</b>
+      ${r.meta ? `<span class="cl-meta">${esc(r.meta)}</span>` : ""}
+      ${r.meta2 ? `<span class="cl-meta"><em>${esc(r.meta2)}</em></span>` : ""}
+    </button>
+    ${act ? `<button class="cl-keep" data-clean-act="${esc(JSON.stringify(act))}">Keep this one${act.drop.length > 1 ? `, fold in ${act.drop.length}` : ""}</button>` : ""}
+  </div>`;
 }
 
 // Pure, so the markup this screen really ships can be rendered outside the browser — by a test, or
-// by a preview page — instead of being reimplemented somewhere that quietly drifts from it.
-function cleanBodyHtml(scan) {
+// by a preview page — instead of being reimplemented somewhere that quietly drifts from it. The
+// pending confirmation arrives as data for the same reason: what a merge is about to do is the part
+// most worth asserting on.
+function cleanBodyHtml(scan, pending) {
   if (!scan.total) return `
     <div class="cl-empty">
       <div class="big">Nothing to fix</div>
@@ -1847,21 +1929,97 @@ function cleanBodyHtml(scan) {
     <section class="cl-sec">
       <div class="cl-sec-h"><h5>${esc(s.title)}</h5><span class="n">${s.items.length}</span></div>
       <p class="cl-why">${esc(s.why)}</p>
-      ${s.items.map(i => `
+      ${s.items.map(i => {
+        // While a row is asking "are you sure", every other way to act on it is taken away: the
+        // answer has to be the confirmation or the cancel, not a second merge started underneath.
+        const asking = !!pending && pending.key === i.key;
+        return `
         <div class="cl-item">
           <div class="cl-main">
             ${i.headline ? `<div class="cl-line">${i.headline}</div>` : ""}
-            <div class="cl-cands" style="margin-top:${i.headline ? "6px" : "0"}">${i.refs.map(cleanRefHtml).join("")}</div>
+            <div class="cl-cands" style="margin-top:${i.headline ? "6px" : "0"}">${i.refs.map(r => cleanRefHtml(r, asking ? null : i)).join("")}</div>
+            ${!asking && i.acts && i.acts.length ? `<div class="cl-acts">${i.acts.map(a =>
+              `<button class="cl-act${a.danger ? " danger" : ""}" data-clean-act="${esc(JSON.stringify({ ...a, item: i.key }))}">${esc(a.label)}</button>`).join("")}</div>` : ""}
+            ${asking ? `<div class="cl-confirm">
+              <p>${pending.text}</p>
+              <button class="cl-act" data-clean-cancel="1">Cancel</button>
+              <button class="cl-act danger" data-clean-go="1">${esc(pending.go)}</button>
+            </div>` : ""}
           </div>
           <button class="cl-skip" data-clean-skip="${esc(i.key)}" title="Hide this for good">Not a problem</button>
-        </div>`).join("")}
+        </div>`;
+      }).join("")}
     </section>`).join("");
+}
+
+// What a repair asks before it runs. Only the three that destroy a record ask; retyping a link and
+// deleting one are a click, the way they already are in the drawer.
+function cleanConfirm(act) {
+  const b = s => `<b>${esc(s)}</b>`;
+  if (act.op === "mp") return {
+    go: "Merge",
+    text: act.drop.length === 1
+      ? `Keep ${b(act.name)} and fold ${b(act.dropNames[0])} into it? Every link, fact, job and past conversation on the second one moves across, and an archived copy makes this recoverable.`
+      : `Keep ${b(act.name)} and fold the other ${act.drop.length} records into it? Everything they hold moves across, and an archived copy of each makes this recoverable.`,
+  };
+  if (act.op === "mo") return {
+    go: "Merge",
+    text: `Keep ${b(act.name)} and fold ${b(act.dropNames[0])} into it? Its members move across and everyone still filed under the old name is refiled.`,
+  };
+  if (act.op === "do") return {
+    go: "Delete",
+    text: `Delete ${b(act.name)}? Nobody is affiliated to it. An archived copy makes this recoverable.`,
+  };
+  return null;
+}
+
+// Every repair is one call. A merge across five tables is a single transaction on the server, so it
+// cannot stop halfway and leave a record whose facts moved but whose links did not.
+async function cleanApply(act) {
+  const chk = r => { if (r.error) throw new Error(r.error.message); return r; };
+  if (act.op === "mp" || act.op === "mo") {
+    const fn = act.op === "mp" ? "merge_people" : "merge_orgs";
+    for (const id of act.drop) chk(await sb.rpc(fn, { keep_id: act.keep, drop_id: id }));
+    return act.drop.length === 1 ? `${act.name} kept, the duplicate folded in` : `${act.name} kept, ${act.drop.length} duplicates folded in`;
+  }
+  if (act.op === "do") {
+    chk(await sb.rpc("delete_org", { p_id: act.org }));
+    return `${act.name} deleted`;
+  }
+  if (act.op === "ek") {
+    chk(await sb.rpc("set_edge_kind", {
+      p_a_id: act.a, p_b_id: act.b, p_old_kind: act.old, p_new_kind: act.kind, p_swap: !!act.swap,
+    }));
+    return `Filed as ${act.kind}`;
+  }
+  if (act.op === "ed") {
+    // Which way round the link is stored depends on its kind, so both orientations are matched.
+    chk(await sb.from("edges").delete().eq("kind", act.kind)
+      .or(`and(a_id.eq.${act.a},b_id.eq.${act.b}),and(a_id.eq.${act.b},b_id.eq.${act.a})`));
+    return "Link deleted";
+  }
+  throw new Error(`unknown repair: ${act.op}`);
+}
+
+async function cleanRun(el, act) {
+  const row = el.closest(".cl-item");
+  if (row) row.classList.add("busy");
+  try {
+    const msg = await cleanApply(act);
+    cleanPending = null;
+    toast(msg);
+    await reload();
+    if (cleanOpen) renderClean();
+  } catch (e) {
+    if (row) row.classList.remove("busy");
+    toast(e.message || String(e), "err");
+  }
 }
 
 function renderClean() {
   const scan = cleanScan(DATA, cleanSkipped);
   $("cleanCount").textContent = scan.total ? `${scan.total} to look at` : "";
-  $("cleanBody").innerHTML = cleanBodyHtml(scan);
+  $("cleanBody").innerHTML = cleanBodyHtml(scan, cleanPending);
 
   const n = cleanSkipped.size;
   $("cleanSkipped").textContent = n ? `${n} marked “not a problem”` : "";
@@ -1871,9 +2029,24 @@ function renderClean() {
     el.onclick = () => { closeCleanModal(); select(Number(el.dataset.cleanPerson)); });
   $("cleanBody").querySelectorAll("[data-clean-org]").forEach(el =>
     el.onclick = () => { closeCleanModal(); selectOrg(Number(el.dataset.cleanOrg)); });
+  $("cleanBody").querySelectorAll("[data-clean-act]").forEach(el =>
+    el.onclick = () => {
+      const act = JSON.parse(el.dataset.cleanAct);
+      const ask = cleanConfirm(act);
+      if (!ask) return cleanRun(el, act);
+      cleanPending = { key: act.item, act, text: ask.text, go: ask.go };
+      renderClean();
+      const go = $("cleanBody").querySelector("[data-clean-go]");
+      if (go) { go.focus(); go.scrollIntoView({ block: "nearest" }); }
+    });
+  $("cleanBody").querySelectorAll("[data-clean-cancel]").forEach(el =>
+    el.onclick = () => { cleanPending = null; renderClean(); });
+  $("cleanBody").querySelectorAll("[data-clean-go]").forEach(el =>
+    el.onclick = () => cleanRun(el, cleanPending.act));
   $("cleanBody").querySelectorAll("[data-clean-skip]").forEach(el =>
     el.onclick = async () => {
       cleanSkipped.add(el.dataset.cleanSkip);
+      cleanPending = null;
       renderClean(); cleanBadge();
       await cleanSaveSkipped();
     });
@@ -1882,11 +2055,13 @@ function renderClean() {
 function openCleanModal() {
   $("cleanScrim").classList.add("open"); $("cleanModal").classList.add("open");
   cleanOpen = true;
+  cleanPending = null;
   renderClean();
 }
 function closeCleanModal() {
   $("cleanScrim").classList.remove("open"); $("cleanModal").classList.remove("open");
   cleanOpen = false;
+  cleanPending = null;
 }
 function wireCleanModal() {
   $("cleanBtn").onclick = () => { closePalette(); openCleanModal(); };
@@ -4252,7 +4427,15 @@ function wire() {
       else if (e.key === "Enter") { e.preventDefault(); pick(); }
       return;
     }
-    if (cleanOpen) { if (e.key === "Escape") { e.preventDefault(); closeCleanModal(); } return; }
+    // Escape backs out of a pending merge first: closing the whole screen on the keystroke that was
+    // meant to cancel one row is how somebody stops trusting the escape key.
+    if (cleanOpen) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (cleanPending) { cleanPending = null; renderClean(); } else closeCleanModal();
+      }
+      return;
+    }
     if (gedOpen) { if (e.key === "Escape") { e.preventDefault(); closeGedModal(); } return; }
     if (famModalOpen) { if (e.key === "Escape") { e.preventDefault(); closeFamModal(); } return; }
     if (typing) return;

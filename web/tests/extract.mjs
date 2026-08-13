@@ -145,10 +145,11 @@ const cleanSource = [
   sliceFunction(html, "function cleanScan("),
   sliceFunction(html, "function cleanRefHtml("),
   sliceFunction(html, "function cleanBodyHtml("),
-  "return { cleanFold, cleanOrgFold, cleanDomainFold, cleanTokensSubset, cleanScan, cleanBodyHtml };",
+  sliceFunction(html, "function cleanConfirm("),
+  "return { cleanFold, cleanOrgFold, cleanDomainFold, cleanTokensSubset, cleanScan, cleanBodyHtml, cleanConfirm };",
 ].join("\n");
 
-export const { cleanFold, cleanOrgFold, cleanDomainFold, cleanTokensSubset, cleanScan, cleanBodyHtml } =
+export const { cleanFold, cleanOrgFold, cleanDomainFold, cleanTokensSubset, cleanScan, cleanBodyHtml, cleanConfirm } =
   new Function(cleanSource)();
 
 // The GEDCOM importer decides who is the same person as whom, so a regression here writes a

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cleanFold, cleanOrgFold, cleanDomainFold, cleanTokensSubset, cleanScan } from "./extract.mjs";
+import { cleanFold, cleanOrgFold, cleanDomainFold, cleanTokensSubset, cleanScan, cleanBodyHtml, cleanConfirm } from "./extract.mjs";
 
 // Synthetic people only, per AGENTS.md. The shape mirrors what `DATA` carries after `load()`.
 const person = (id, name, extra = {}) => ({
@@ -176,4 +176,146 @@ test("a skipped key disappears and is counted, and skipping one does not hide an
 
 test("an empty graph scans clean rather than throwing", () => {
   assert.equal(scan({}).total, 0);
+});
+
+// ── the repairs the screen offers ────────────────────────────────────────────
+// Everything below is about what a click is going to do to the graph. A button that names the
+// wrong record, or points a parent link the wrong way, does its damage silently.
+
+const acts = item => (item.acts || []).map(a => a.label);
+const actOf = (item, label) => (item.acts || []).find(a => a.label === label);
+
+test("every kind of duplicate offers to keep one record and fold the rest in", () => {
+  const people = [
+    person(1, "Ambroise Vantard", { identifiers: [{ kind: "email", value: "a@vantard.example" }] }),
+    person(2, "A. Vantard", { identifiers: [{ kind: "email", value: "a@vantard.example" }] }),
+    person(3, "Eloise Rouyer"), person(4, "eloise rouyer"),
+    person(5, "Marc Halloway"), person(6, "Marc Julien Halloway"),
+  ];
+  const res = scan({ people });
+  for (const id of ["dup-ident", "dup-name", "dup-near"])
+    assert.ok(section(res, id).items.every(i => i.merge === "person"), `${id} is repairable`);
+});
+
+test("two organizations matched as one offer the same, and an empty one offers deletion", () => {
+  const orgs = [{ id: 1, name: "Kite Freight" }, { id: 2, name: "Kite Freight Inc" }];
+  const res = scan({ orgs });
+  assert.equal(section(res, "dup-org").items[0].merge, "org");
+  const empty = section(res, "org-empty").items;
+  assert.equal(empty.length, 2);
+  assert.deepEqual(acts(empty[0]), ["Delete it"]);
+  // The confirmation names the organization, so it has to travel with the action, not be looked up.
+  assert.equal(actOf(empty[0], "Delete it").name, "Kite Freight");
+});
+
+test("a merge is confirmed before it runs, and says what it is about to move", () => {
+  const ask = cleanConfirm({ op: "mp", name: "Ambroise Vantard", drop: [2], dropNames: ["A. Vantard"] });
+  assert.equal(ask.go, "Merge");
+  assert.match(ask.text, /Ambroise Vantard/);
+  assert.match(ask.text, /A\. Vantard/);
+  assert.match(ask.text, /recoverable/);
+  assert.match(cleanConfirm({ op: "do", name: "Kite Freight" }).text, /Kite Freight/);
+  assert.equal(cleanConfirm({ op: "do", name: "x" }).go, "Delete");
+});
+
+test("retyping a link and deleting one run on the click, without a confirmation", () => {
+  assert.equal(cleanConfirm({ op: "ek", kind: "sibling" }), null);
+  assert.equal(cleanConfirm({ op: "ed", kind: "family" }), null);
+});
+
+test("a name in a confirmation is escaped before it reaches the page", () => {
+  const ask = cleanConfirm({ op: "mp", name: "<img src=x onerror=alert(1)>", drop: [2], dropNames: ["b"] });
+  assert.ok(!ask.text.includes("<img"));
+  assert.match(ask.text, /&lt;img/);
+});
+
+test("an unclassified family link offers every generation it could be, and says who is who", () => {
+  const people = [person(1, "Ambroise Vantard"), person(2, "Eloise Vantard")];
+  const res = scan({ people, edges: [{ a: 1, b: 2, kind: "family" }] });
+  const item = section(res, "link-vague").items[0];
+  assert.deepEqual(acts(item),
+    ["Ambroise is the parent", "Eloise is the parent", "Siblings", "Partners", "Delete the link"]);
+
+  // The two "parent" buttons differ only in which end they put first — get that backwards and the
+  // family tree draws a daughter above her mother.
+  const first = actOf(item, "Ambroise is the parent"), second = actOf(item, "Eloise is the parent");
+  assert.deepEqual([first.a, first.b, first.kind, first.swap], [1, 2, "parent", false]);
+  assert.deepEqual([second.a, second.b, second.kind, second.swap], [1, 2, "parent", true]);
+  assert.equal(actOf(item, "Siblings").old, "family", "the link it replaces has to be named");
+});
+
+test("two relatives who share a first name are told apart by their full names", () => {
+  const people = [person(1, "Jean Raillere"), person(2, "Jean Raillere-Racou")];
+  const res = scan({ people, edges: [{ a: 1, b: 2, kind: "family" }] });
+  assert.deepEqual(acts(section(res, "link-vague").items[0]).slice(0, 2),
+    ["Jean Raillere is the parent", "Jean Raillere-Racou is the parent"]);
+});
+
+test("a child born before their parent is offered the flip, not just the delete", () => {
+  const people = [
+    person(1, "Ambroise Vantard", { birthdate: "1990-01-01" }),
+    person(2, "Eloise Vantard", { birthdate: "1960-01-01" }),
+  ];
+  const res = scan({ people, edges: [{ a: 1, b: 2, kind: "parent" }] });
+  const item = section(res, "link-broken").items.find(i => i.key.startsWith("gap:"));
+  assert.deepEqual(acts(item), ["Flip it — Eloise is the parent", "Delete the parent link"]);
+  const flip = item.acts[0];
+  assert.deepEqual([flip.op, flip.a, flip.b, flip.old, flip.kind, flip.swap], ["ek", 1, 2, "parent", "parent", true]);
+});
+
+test("a gap that is only too small offers no flip — the fix is a merge nobody can guess", () => {
+  const people = [
+    person(1, "Eloise Vantard", { birthdate: "1980-01-01" }),
+    person(2, "Ambroise Vantard", { birthdate: "1985-01-01" }),
+  ];
+  const res = scan({ people, edges: [{ a: 1, b: 2, kind: "parent" }] });
+  const item = section(res, "link-broken").items.find(i => i.key.startsWith("gap:"));
+  assert.deepEqual(acts(item), ["Delete the parent link"]);
+});
+
+test("two links that cannot both be true offer to drop either one", () => {
+  const people = [person(1, "Ambroise Vantard"), person(2, "Eloise Vantard")];
+  const res = scan({ people, edges: [{ a: 1, b: 2, kind: "parent" }, { a: 1, b: 2, kind: "sibling" }] });
+  const item = section(res, "link-broken").items.find(i => i.key.startsWith("clash:"));
+  assert.deepEqual(acts(item), ["Delete the parent link", "Delete the sibling link"]);
+  assert.deepEqual(item.acts.map(a => a.kind), ["parent", "sibling"]);
+});
+
+test("a finding nobody can repair with one click offers nothing rather than a guess", () => {
+  const people = [1, 2, 3, 4].map(i => person(i, `Person ${i}`));
+  const res = scan({ people, edges: [2, 3, 4].map(a => ({ a, b: 1, kind: "parent" })) });
+  const item = section(res, "link-broken").items.find(i => i.key === "parents:1");
+  assert.deepEqual(acts(item), []);
+});
+
+test("the panel renders a keep button per record, and hides them while one is being confirmed", () => {
+  const people = [person(1, "Ambroise Vantard"), person(2, "ambroise vantard")];
+  const res = scan({ people });
+  const open = cleanBodyHtml(res, null);
+  assert.equal((open.match(/class="cl-keep"/g) || []).length, 2);
+  assert.ok(!open.includes("cl-confirm"));
+
+  const asking = cleanBodyHtml(res, { key: "name:1+2", text: "Sure?", go: "Merge" });
+  assert.ok(asking.includes("cl-confirm"));
+  assert.ok(asking.includes("data-clean-go"));
+  assert.ok(!asking.includes("cl-keep"), "no second merge can be started under an open question");
+});
+
+test("a confirmation on one row leaves the other rows usable", () => {
+  const people = [person(1, "A A"), person(2, "a a"), person(3, "B B"), person(4, "b b")];
+  const html = cleanBodyHtml(scan({ people }), { key: "name:1+2", text: "Sure?", go: "Merge" });
+  assert.equal((html.match(/class="cl-keep"/g) || []).length, 2, "the untouched pair keeps its buttons");
+});
+
+test("an action survives the round trip through the attribute it is written into", () => {
+  const people = [person(1, 'Ambroise "Ambro" Vantard'), person(2, 'ambroise "ambro" vantard')];
+  const html = cleanBodyHtml(scan({ people }), null);
+  const raw = html.match(/data-clean-act="([^"]*)"/)[1];
+  const decoded = raw.replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  const act = JSON.parse(decoded);
+  assert.equal(act.op, "mp");
+  assert.equal(act.item, "name:1+2");
+  assert.deepEqual([act.keep, act.drop], [1, [2]]);
+  assert.equal(act.name, 'Ambroise "Ambro" Vantard');
 });
