@@ -91,6 +91,17 @@ const familySource = [
 
 export const { buildFamilyTree, famNodeHtml, edgeKindLabel, setData, setById } = new Function(familySource)();
 
+// `pickPerson` is what stands between a typed name and a link written to the wrong person, which
+// is silent damage — no error, no visible difference, just an edge on the wrong record.
+const pickSource = [
+  "let DATA = { people: [] };",
+  sliceFunction(html, "function personTag("),
+  sliceFunction(html, "function pickPerson("),
+  "return { personTag, pickPerson, setPeople: p => { DATA = { people: p }; } };",
+].join("\n");
+
+export const { personTag, pickPerson, setPeople } = new Function(pickSource)();
+
 // The GEDCOM importer decides who is the same person as whom, so a regression here writes a
 // duplicate into the live graph. Same rule as above: run the shipped source, never a copy of it.
 const gedSource = [

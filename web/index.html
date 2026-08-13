@@ -2071,9 +2071,7 @@ function renderDrawer(p) {
     chk(await sb.from("interactions").delete().eq("id", +x.dataset.dx)), "interaction deleted"));
 
   $("addE").onclick = () => run(async () => {
-    const name = $("et").value.trim();
-    const t = DATA.people.find(q => q.name === name && q.id !== p.id);
-    if (!t) throw new Error("Person not found. Choose an exact name from the list.");
+    const t = pickPerson($("et").value, p.id);
     const sel = $("ek").value;
     // "child" is a UI-only alias: it writes kind="parent" with a_id/b_id swapped, so the
     // typed person ends up as the parent regardless of which end you're editing from.
@@ -2341,6 +2339,36 @@ function newPerson(name) {
   if (name) $("f_name").value = name;
 }
 
+/**
+ * A name is not an identity: the graph holds three people called Marie Rouyer, and a son named
+ * after his father is ordinary in a family tree. `personTag` is what a picker shows when a name is
+ * shared, and `pickPerson` reads it back — by id when the text carries one, by name otherwise, and
+ * it refuses rather than guessing when the name alone matches several people. Silently taking the
+ * first match would attach the link to the wrong person, with nothing on screen to reveal it.
+ */
+function personTag(p) {
+  const hint = p.birthdate || p.org || p.city;
+  return hint ? `${p.name} (${hint}) #${p.id}` : `${p.name} #${p.id}`;
+}
+function pickPerson(raw, excludeId) {
+  const text = String(raw ?? "").trim();
+  if (!text) throw new Error("Type a person's name.");
+  const tagged = text.match(/#(\d+)\s*$/);
+  if (tagged) {
+    const t = DATA.people.find(q => q.id === +tagged[1]);
+    if (!t) throw new Error("That person is no longer in the graph. Reload and try again.");
+    if (t.id === excludeId) throw new Error("That is the same person.");
+    return t;
+  }
+  const hits = DATA.people.filter(q => q.name === text && q.id !== excludeId);
+  if (!hits.length) throw new Error("Person not found. Choose an exact name from the list.");
+  if (hits.length > 1) {
+    throw new Error(`${hits.length} people are called ${text}. Pick the right one from the list: `
+      + hits.map(personTag).join(", "));
+  }
+  return hits[0];
+}
+
 // ── filters UI ────────────────────────────────────────────
 function renderFilters() {
   $("ties").innerHTML = [0, 1, 2, 3].map(t => `
@@ -2357,7 +2385,14 @@ function renderFilters() {
     orgs.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
   $("orgFilter").value = orgFilter;
   $("orgs-dl").innerHTML = DATA.orgs.map(o => `<option value="${esc(o.name)}">`).join("");
-  $("people-dl").innerHTML = DATA.people.map(p => `<option value="${esc(p.name)}">`).join("");
+  // Two people can share a name (three sisters called Marie Rouyer, a son named after his father).
+  // A bare list would then offer identical options and the picker below could only guess, so a
+  // shared name carries its id — that is what `pickPerson` reads back.
+  const sharedName = new Set();
+  const seenName = new Set();
+  for (const p of DATA.people) (seenName.has(p.name) ? sharedName : seenName).add(p.name);
+  $("people-dl").innerHTML = DATA.people
+    .map(p => `<option value="${esc(sharedName.has(p.name) ? personTag(p) : p.name)}">`).join("");
 }
 function renderActiveFilters() {
   const chips = [];
