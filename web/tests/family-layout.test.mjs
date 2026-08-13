@@ -57,6 +57,16 @@ test("a spouse's own siblings never join yours in one run", () => {
   assert.ok(gap > 0, "and they are not the same block");
 });
 
+test("a spouse sits next to their own husband or wife, not at the end of the siblings", () => {
+  // 1 is married to 10 and has four siblings. The edge list happens to put him in the middle of
+  // them, which parked Solange four people away from Michel on the live graph (2026-08-13).
+  const pos = famLayout([
+    sibling(2, 1), sibling(3, 1), sibling(1, 4), sibling(1, 5), partner(1, 10),
+  ]);
+  assert.equal(pos.get(1).y, pos.get(10).y);
+  assert.equal(Math.abs(pos.get(1).x - pos.get(10).x), TREE_COL, "the spouse is not in the next column along");
+});
+
 test("a parent's row wins over a partner's, so an in-law never floats a generation up", () => {
   // 3 marries into the family: 1 is 2's parent, 2 and 3 are partners
   const pos = famLayout([parent(1, 2), partner(2, 3)]);

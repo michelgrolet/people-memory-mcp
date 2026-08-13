@@ -1408,8 +1408,13 @@ function famLayout(edges) {
   const groups = [...members.keys()];
   const gi = new Map(groups.map((g, i) => [g, i]));
 
-  // 2. parent and partner edges lifted onto groups, deduplicated
+  // 2. parent and partner edges lifted onto groups, deduplicated. `pmate` keeps the marriage at
+  //    person level as well, which is what step 6 needs to sit a couple next to each other.
   const up = groups.map(() => []), down = groups.map(() => []), mate = groups.map(() => []);
+  const pmate = new Map();
+  for (const e of fam) if (e.kind === "partner") for (const [x, y] of [[e.a, e.b], [e.b, e.a]]) {
+    const l = pmate.get(x); l ? l.push(y) : pmate.set(x, [y]);
+  }
   const pe = new Set();
   for (const e of fam) {
     if (e.kind === "sibling") continue;
@@ -1491,17 +1496,34 @@ function famLayout(edges) {
     //    under the generation above it, which is what shortens the long horizontal runs. Centring
     //    every row on the component instead leaves a couple stranded far from their own children.
     const size = g => members.get(groups[g]).length;
+    // Someone who married in and has nobody else on this tree is not a family of their own: they
+    // belong beside the person they married, inside that family's block. Left loose in the row
+    // they get pushed out by whoever else married into the same sibling set — on the live graph
+    // that put Solange five people away from Michel with his brother-in-law in between.
+    const isLeafSpouse = g => size(g) === 1 && !up[g].length && !down[g].length && mate[g].length === 1;
+    const attached = new Map(), hosted = new Set();
+    for (const row of rows) {
+      if (!row) continue;
+      for (const g of row) {
+        const m = mate[g][0];
+        if (!isLeafSpouse(g) || isLeafSpouse(m)) continue;   // two people and nothing else: leave them be
+        const l = attached.get(m); l ? l.push(g) : attached.set(m, [g]);
+        hosted.add(g);
+      }
+    }
+    for (let r = 0; r < rows.length; r++) if (rows[r]) rows[r] = rows[r].filter(g => !hosted.has(g));
+    const esize = g => size(g) + (attached.get(g) || []).length;
     const lx = new Map(), rowOf = new Map(), off = rows.map(() => 0), rowW = rows.map(() => 0);
     rows.forEach((row, r) => {
       if (!row) return;
       let cur = 0, prev = -1;
       for (const g of row) {
         if (prev >= 0) cur += mate[prev].includes(g) ? TREE_MATE_GAP : TREE_GAP;
-        lx.set(g, cur); rowOf.set(g, r); cur += size(g); prev = g;
+        lx.set(g, cur); rowOf.set(g, r); cur += esize(g); prev = g;
       }
       rowW[r] = cur;
     });
-    const mid = g => off[rowOf.get(g)] + lx.get(g) + size(g) / 2;
+    const mid = g => off[rowOf.get(g)] + lx.get(g) + esize(g) / 2;
     for (let s = 0; s < 8; s++) {
       const downward = s % 2 === 0;
       for (let i = 0; i < rows.length; i++) {
@@ -1512,7 +1534,7 @@ function famLayout(edges) {
         for (const g of row) {
           const rel = downward ? up[g] : down[g];
           if (!rel.length) continue;
-          sum += rel.reduce((a, o) => a + mid(o), 0) / rel.length - (lx.get(g) + size(g) / 2);
+          sum += rel.reduce((a, o) => a + mid(o), 0) / rel.length - (lx.get(g) + esize(g) / 2);
           n++;
         }
         if (n) off[r] = sum / n;
@@ -1524,13 +1546,32 @@ function famLayout(edges) {
       if (!row) return;
       left = Math.min(left, off[r]); right = Math.max(right, off[r] + rowW[r]);
     });
+    // Inside a sibling set the order was whatever the edge list happened to hold, which parks the
+    // married brother in the middle of his siblings and his wife at the far end of the row, four
+    // people away from him. Whoever has a spouse in the group to the left goes to the left edge,
+    // to the right goes to the right edge, and everyone else keeps their order.
+    const facing = (id, g) => g !== undefined && (pmate.get(id) || []).some(o => gi.get(find(o)) === g);
     const cells = [];
     rows.forEach((row, r) => {
       if (!row) return;
-      for (const g of row) {
+      row.forEach((g, k) => {
+        const mem = members.get(groups[g]);
+        const ordered = mem.length < 2 ? mem
+          : mem.map((id, i) => ({ id, i, s: (facing(id, row[k - 1]) ? -1 : 0) + (facing(id, row[k + 1]) ? 1 : 0) }))
+              .sort((a, b) => a.s - b.s || a.i - b.i).map(x => x.id);
+        // and the spouses attached above ride in the next column along from the one they married
+        const ride = new Map();
+        for (const h of attached.get(g) || []) {
+          const sp = members.get(groups[h])[0];
+          const to = (pmate.get(sp) || []).find(o => gi.get(find(o)) === g) ?? ordered[ordered.length - 1];
+          const l = ride.get(to); l ? l.push(sp) : ride.set(to, [sp]);
+        }
         let col = off[r] + lx.get(g) - left;
-        for (const id of members.get(groups[g])) { cells.push({ id, col, row: r }); col += 1; }
-      }
+        for (const id of ordered) {
+          cells.push({ id, col, row: r }); col += 1;
+          for (const sp of ride.get(id) || []) { cells.push({ id: sp, col, row: r }); col += 1; }
+        }
+      });
     });
     laid.push({ cells, w: Math.max(right - left, 1), h: rows.length });
   }
