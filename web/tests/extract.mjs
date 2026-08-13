@@ -102,6 +102,17 @@ const pickSource = [
 
 export const { personTag, pickPerson, setPeople } = new Function(pickSource)();
 
+// Same trap one level up: an org name is not an id either, and the GEDCOM import can hand two
+// branches of a family the same employer name.
+const pickOrgSource = [
+  "let DATA = { orgs: [] };",
+  sliceFunction(html, "function orgTag("),
+  sliceFunction(html, "function pickOrg("),
+  "return { orgTag, pickOrg, setOrgs: o => { DATA = { orgs: o }; } };",
+].join("\n");
+
+export const { orgTag, pickOrg, setOrgs } = new Function(pickOrgSource)();
+
 // The GEDCOM importer decides who is the same person as whom, so a regression here writes a
 // duplicate into the live graph. Same rule as above: run the shipped source, never a copy of it.
 const gedSource = [

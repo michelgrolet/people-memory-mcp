@@ -1823,7 +1823,9 @@ function renderOrgDrawer(o) {
     const name = $("o_parent").value.trim();
     let newParentId = null;
     if (name) {
-      const match = DATA.orgs.find(x => x.name.toLowerCase() === name.toLowerCase());
+      let match;
+      try { match = pickOrg(name); }
+      catch (e) { $("o_parent").value = parentOrg ? parentOrg.name : ""; hint(e.message, "err"); toast(e.message, "err"); return; }
       if (!match) { $("o_parent").value = parentOrg ? parentOrg.name : ""; hint("organization not found", "err"); toast("Organization not found. Choose an exact name from the list.", "err"); return; }
       if (match.id === o.id) { $("o_parent").value = parentOrg ? parentOrg.name : ""; hint("can't be its own parent", "err"); toast("An organization can't be its own parent.", "err"); return; }
       newParentId = match.id;
@@ -2081,7 +2083,7 @@ function renderDrawer(p) {
   $("addA").onclick = () => run(async () => {
     const name = $("ao").value.trim(); if (!name) throw new Error("Organization name is empty.");
     const role = $("ar").value.trim();
-    let org = DATA.orgs.find(o => o.name.toLowerCase() === name.toLowerCase());
+    let org = pickOrg(name);
     if (!org) org = chk(await sb.from("orgs").insert({ name }).select().single()).data;
     chk(await sb.from("affiliations").upsert({ person_id: p.id, org_id: org.id, role, source: "dashboard" }));
     chk(await sb.from("people").update({ current_org: org.name, current_role: role || null }).eq("id", p.id));
@@ -2369,6 +2371,35 @@ function pickPerson(raw, excludeId) {
   return hits[0];
 }
 
+/**
+ * Same problem as pickPerson, one level up: an organization name is not an id either, and the
+ * GEDCOM import can hand two branches of a family the same employer name. `pickOrg` resolves by
+ * id when the text carries a tag, by name otherwise (case-insensitive, matching how the org fields
+ * already compared names before this existed), and refuses instead of guessing when a bare name
+ * matches more than one org. Returns null on no match, since callers differ on what that means:
+ * "create a new org" for an affiliation, "not found" for a parent-org field.
+ */
+function orgTag(o) {
+  const hint = o.domain || o.city;
+  return hint ? `${o.name} (${hint}) #${o.id}` : `${o.name} #${o.id}`;
+}
+function pickOrg(raw) {
+  const text = String(raw ?? "").trim();
+  if (!text) return null;
+  const tagged = text.match(/#(\d+)\s*$/);
+  if (tagged) {
+    const t = DATA.orgs.find(q => q.id === +tagged[1]);
+    if (!t) throw new Error("That organization is no longer in the graph. Reload and try again.");
+    return t;
+  }
+  const hits = DATA.orgs.filter(q => q.name.toLowerCase() === text.toLowerCase());
+  if (hits.length > 1) {
+    throw new Error(`${hits.length} organizations are called ${text}. Pick the right one from the list: `
+      + hits.map(orgTag).join(", "));
+  }
+  return hits[0] || null;
+}
+
 // ── filters UI ────────────────────────────────────────────
 function renderFilters() {
   $("ties").innerHTML = [0, 1, 2, 3].map(t => `
@@ -2384,7 +2415,12 @@ function renderFilters() {
   $("orgFilter").innerHTML = `<option value="">all organizations</option>` +
     orgs.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join("");
   $("orgFilter").value = orgFilter;
-  $("orgs-dl").innerHTML = DATA.orgs.map(o => `<option value="${esc(o.name)}">`).join("");
+  // Two organizations can share a name too (a subsidiary named after its parent, an old employer
+  // re-founded under the same name); tag those the same way shared people names are tagged below.
+  const sharedOrgName = new Set(), seenOrgName = new Set();
+  for (const o of DATA.orgs) { const k = o.name.toLowerCase(); (seenOrgName.has(k) ? sharedOrgName : seenOrgName).add(k); }
+  $("orgs-dl").innerHTML = DATA.orgs
+    .map(o => `<option value="${esc(sharedOrgName.has(o.name.toLowerCase()) ? orgTag(o) : o.name)}">`).join("");
   // Two people can share a name (three sisters called Marie Rouyer, a son named after his father).
   // A bare list would then offer identical options and the picker below could only guess, so a
   // shared name carries its id — that is what `pickPerson` reads back.
