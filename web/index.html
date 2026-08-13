@@ -178,6 +178,7 @@
   #legend .ramp{display:flex;gap:2px;margin:0 2px}
   #legend .ramp i{width:10px;height:10px;border-radius:50%}
   #legend .dia{width:9px;height:9px;transform:rotate(45deg)}
+  #legend .dash{width:16px;height:0;border-top:2px dashed var(--org);opacity:.75;flex:none}
   #kindLegend{display:none;flex-wrap:wrap;gap:4px 12px;max-width:230px;margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
   #kindLegend.show{display:flex}
   #kindLegend .kl{display:flex;align-items:center;gap:5px;white-space:nowrap}
@@ -714,6 +715,7 @@
       close
     </div>
     <div class="row"><span class="dia" style="background:var(--org)"></span> organization</div>
+    <div class="row"><span class="dash"></span> parent company</div>
     <div class="row" style="opacity:.65">unconnected people stay in the directory <kbd>⌘K</kbd></div>
     <div id="kindLegend"></div>
   </div>
@@ -1628,6 +1630,15 @@ function buildGraph() {
       const x = addP(a.person_id), y = addO(a.org_id);
       if (x >= 0 && y >= 0) links.push({ s: x, t: y, kind: "org" });
     });
+    // a suborg and its parent are one company seen at two depths (YouTube under Google), and
+    // without this line the graph shows them as two unrelated diamonds. Whichever side already
+    // has a node pulls the other one in, otherwise the link exists and lands nowhere.
+    DATA.orgs.forEach(o => {
+      if (o.parent_org_id == null) return;
+      if (!idx.has("o" + o.id) && !idx.has("o" + o.parent_org_id)) return;
+      const x = addO(o.parent_org_id), y = addO(o.id);
+      if (x >= 0 && y >= 0) links.push({ s: x, t: y, kind: "suborg" });
+    });
   }
   DATA.edges.forEach(e => { const x = addP(e.a), y = addP(e.b); if (x >= 0 && y >= 0) links.push({ s: x, t: y, kind: e.kind, ea: e.a, eb: e.b }); });
   }
@@ -1681,7 +1692,7 @@ function setTreeMode(on) {
 // ── force simulation (Barnes-Hut) ───────────────────────────────
 let alpha = 1, alphaTarget = 0;
 const ALPHA_MIN = .0015, ALPHA_DECAY = 1 - Math.pow(ALPHA_MIN, 1 / 320), VEL_DECAY = .58;
-const CHARGE = -420, THETA2 = .81, LINK_DIST = 62, ORG_DIST = 54, CENTER = .0022, MAX_V = 70;
+const CHARGE = -420, THETA2 = .81, LINK_DIST = 62, ORG_DIST = 54, SUBORG_DIST = 34, CENTER = .0022, MAX_V = 70;
 const reheat = a => { alpha = Math.max(alpha, a ?? .3); };
 
 function qtNode(x0, y0, x1, y1) { return { x0, y0, x1, y1, m: 0, cx: 0, cy: 0, bodies: [], kids: null }; }
@@ -1740,7 +1751,7 @@ function simStep() {
   for (const l of links) {
     const a = nodes[l.s], b = nodes[l.t];
     // hubs push their leaves further out, otherwise a 60-degree node becomes a smear
-    const target = (l.kind === "org" ? ORG_DIST : LINK_DIST) + Math.min(150, (a.deg + b.deg) * .8) + a.r + b.r;
+    const target = (l.kind === "suborg" ? SUBORG_DIST : l.kind === "org" ? ORG_DIST : LINK_DIST) + Math.min(150, (a.deg + b.deg) * .8) + a.r + b.r;
     let dx = (b.x + b.vx) - (a.x + a.vx), dy = (b.y + b.vy) - (a.y + a.vy);
     let d = Math.sqrt(dx * dx + dy * dy);
     if (d < 1e-6) { dx = .5; dy = .5; d = .7071; }
@@ -1835,7 +1846,9 @@ function computeDim() {
     if (n.type !== "org") return;
     if (!anyFilter) return;
     if (orgFilter && n.label === orgFilter) return;
-    dim[i] = !neigh[i].some(([j]) => !dim[j]);
+    // only its people decide: a suborg link would otherwise keep a parent lit through an org
+    // whose own dim state has not been computed yet
+    dim[i] = !neigh[i].some(([j]) => nodes[j].type === "person" && !dim[j]);
   });
   if (egoSet) nodes.forEach((n, i) => { if (!egoSet.has(i)) dim[i] = true; });
 }
@@ -1885,14 +1898,18 @@ function draw() {
         ctx.strokeStyle = g; ctx.lineWidth = 1.7 / cam.k;
       } else {
         ctx.strokeStyle = d ? "rgba(120,128,145,.06)"
+          : l.kind === "suborg" ? "rgba(45,212,191,.55)"
           : l.kind === "org" ? "rgba(45,212,191,.16)"
           : (colorByKind && EDGE_KIND_COLOR[l.kind]) ? EDGE_KIND_COLOR[l.kind] + "3D"
           : "rgba(150,158,175,.24)";
-        ctx.lineWidth = 1 / cam.k;
+        ctx.lineWidth = (l.kind === "suborg" ? 1.6 : 1) / cam.k;
       }
+      // dashed, so a parent company reads as a different thing from the people it employs
+      ctx.setLineDash(l.kind === "suborg" ? [5 / cam.k, 4 / cam.k] : []);
       linkPath(l);
     }
   }
+  ctx.setLineDash([]);
 
   // nodes
   for (let i = 0; i < nodes.length; i++) {
