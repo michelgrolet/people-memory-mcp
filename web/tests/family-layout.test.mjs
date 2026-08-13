@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { famLayout, TREE_ROW } from "./extract.mjs";
+import { famLayout, TREE_ROW, TREE_COL } from "./extract.mjs";
 
 // The force graph can be wrong and still look fine — a spring is not a claim about anything.
 // A row in the tree view IS a claim: everyone on it belongs to the same generation. So these
@@ -37,8 +37,24 @@ test("partners and siblings share a row and stay next to each other", () => {
   const pos = famLayout([partner(1, 2), parent(1, 3), parent(2, 3), parent(1, 4), sibling(3, 4)]);
   assert.equal(pos.get(1).y, pos.get(2).y, "a couple is one generation");
   assert.equal(pos.get(3).y, pos.get(4).y, "siblings are one generation");
-  assert.equal(Math.abs(pos.get(1).x - pos.get(2).x), 76, "the couple is not split apart");
+  assert.ok(Math.abs(pos.get(1).x - pos.get(2).x) < TREE_COL * 2, "the couple is not split apart");
   assert.equal(pos.get(3).y - pos.get(1).y, TREE_ROW);
+});
+
+test("a spouse's own siblings never join yours in one run", () => {
+  // Michel + his siblings, married to Solange who has siblings of her own. Merging partners into
+  // the same group as siblings made the two families one unbroken row (2026-08-13).
+  const pos = famLayout([
+    sibling(1, 2), sibling(1, 3),          // his side
+    partner(1, 10),                        // the marriage
+    sibling(10, 11), sibling(10, 12),      // her side
+  ]);
+  const his = [1, 2, 3].map(i => pos.get(i).x), hers = [10, 11, 12].map(i => pos.get(i).x);
+  assert.equal(new Set([...his, ...hers].map(x => pos.get(1).y)).size, 1, "still one generation");
+  const gap = Math.min(...hers.map(h => Math.min(...his.map(x => Math.abs(h - x)))));
+  assert.ok(Math.max(...his) < Math.min(...hers) || Math.max(...hers) < Math.min(...his),
+    "the two families do not interleave");
+  assert.ok(gap > 0, "and they are not the same block");
 });
 
 test("a parent's row wins over a partner's, so an in-law never floats a generation up", () => {

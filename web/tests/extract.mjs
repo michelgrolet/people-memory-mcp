@@ -98,6 +98,7 @@ const layoutSource = [
   sliceStatement(html, "const TREE_ROW = "),
   sliceStatement(html, "const TREE_COL = "),
   sliceStatement(html, "const TREE_GAP = "),
+  sliceStatement(html, "const TREE_MATE_GAP = "),
   sliceStatement(html, "const TREE_PAD = "),
   sliceFunction(html, "function famLayout("),
   "return { famLayout, TREE_ROW, TREE_COL };",

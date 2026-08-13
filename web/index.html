@@ -512,6 +512,20 @@
   .fam-node-name{font-size:12.5px;white-space:nowrap}
   .fam-connector{width:1px;height:14px;background:var(--line2)}
   .fam-empty{text-align:center;color:var(--muted);font-size:13px;padding:30px 0}
+  /* the same tree, shrunk to fit the record drawer */
+  .fam-mini .fam-gen{gap:6px;margin:0 auto 11px;max-width:none}
+  .fam-mini .fam-row{gap:6px}
+  .fam-mini .fam-connector{height:9px}
+  .fam-mini .fam-node{padding:3px 9px 3px 3px;gap:6px}
+  .fam-mini .fam-node-avatar{width:20px;height:20px;font-size:9px}
+  .fam-mini .fam-node-name{font-size:11.5px}
+  .fam-node .x{color:var(--muted);cursor:pointer;font-size:11px;line-height:1;opacity:0;transition:opacity 130ms,color 130ms}
+  .fam-node:hover .x{opacity:1}
+  .fam-node .x:hover{color:var(--red)}
+  /* a category inside the links section */
+  .lgrp+.lgrp{margin-top:13px}
+  .lgrp-h{font:600 10px/1 var(--font);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+  .lgrp-h em.k{font-style:normal;font-family:var(--mono);opacity:.7;margin-left:2px}
 
   /* ── GEDCOM import modal ─────────────────────────────── */
   #gedScrim{
@@ -805,6 +819,20 @@ const EDGE_KINDS = ["friend","family","partner","colleague","classmate","knows",
 // this person "is parent of" / "is child of" the one you type — both writing the same kind
 // with a_id/b_id swapped; see addE below.
 const EDGE_ADD_KINDS = EDGE_KINDS.flatMap(k => k === "parent" ? ["parent", "child"] : [k]);
+// A record's links are not one pile. Family is a shape and gets drawn as a tree; the rest read as
+// categories, in the order somebody actually scans them. A kind missing here lands in "Other",
+// so adding one to EDGE_KINDS can never make a link disappear from the drawer.
+const LINK_GROUPS = [
+  { label: "Friends", kinds: ["friend"] },
+  { label: "Work", kinds: ["colleague", "manager_of", "mentor_of"] },
+  { label: "School", kinds: ["classmate"] },
+  { label: "Neighbours", kinds: ["neighbour"] },
+  { label: "Introductions", kinds: ["introduced"] },
+  { label: "Acquaintances", kinds: ["knows"] },
+];
+// "family" is in here because a generic family link belongs with the family, even though it is
+// too vague to place anyone on a generation row.
+const FAMILY_KINDS = new Set(["parent", "sibling", "partner", "family"]);
 const CHANNELS = ["irl","call","whatsapp","email","linkedin","sms","visio"];
 const TIE_LABEL = {1:"acquaintance",2:"friend",3:"close"};
 const TIE_COLOR = ["#4A4F5C","#8F8360","#C79C4E","#EDB13C"];
@@ -962,32 +990,49 @@ function buildFamilyTree(id) {
   return { person, grandparents, parents: parentsRow, siblings: siblingsOf(id), partners: partnersOf(id), children, grandchildren };
 }
 
-function famNodeHtml(p, isSelf) {
+// `edge`, when given, puts a delete cross on the node — the drawer draws the tree in place of a
+// list of family links, and deleting one has to stay possible from where it is shown. It is only
+// passed for a link actually recorded between the two people: an in-law folded in through a
+// parent's partner has no edge of its own to delete.
+function famNodeHtml(p, isSelf, edge) {
   const color = p.kind === "agent" ? AGENT_COLOR : tieColor(p.tie);
   return `<div class="fam-node${isSelf ? " self" : ""}"${isSelf ? "" : ` data-fam-goto="${p.id}"`}>
     <span class="fam-node-avatar"${isSelf ? "" : ` style="color:${color};border:1px solid ${color}44"`}>${esc(initials(p.name))}</span>
     <span class="fam-node-name">${esc(p.name)}</span>
+    ${edge ? `<span class="x" data-de="${edge.a}|${edge.b}|${esc(edge.kind)}" title="Delete this link">✕</span>` : ""}
   </div>`;
 }
+
+/**
+ * The generation rows, shared by the modal and the drawer. `direct` maps a person id to the edge
+ * recorded between them and the person the tree is centred on, and is left out when the tree is
+ * read-only. Returns "" when nobody is related — the caller says so in its own words.
+ */
+function famRowsHtml(fam, direct) {
+  const n = (p, self) => famNodeHtml(p, self, direct && direct.get(p.id));
+  const rows = [
+    ["Grandparents", fam.grandparents.map(p => n(p))],
+    ["Parents", fam.parents.map(p => n(p))],
+    ["Family", [...fam.siblings.map(p => n(p)), n(fam.person, true), ...fam.partners.map(p => n(p))]],
+    ["Children", fam.children.map(p => n(p))],
+    ["Grandchildren", fam.grandchildren.map(p => n(p))],
+  ].filter(([, html]) => html.length);
+  if (!famCount(fam)) return "";
+  return rows.map(([label, html], i) =>
+    (i > 0 ? `<div class="fam-connector"></div>` : "") +
+    `<div class="fam-gen"><div class="fam-gen-label">${esc(label)}</div><div class="fam-row">${html.join("")}</div></div>`
+  ).join("");
+}
+const famCount = fam => fam ? ["grandparents", "parents", "siblings", "partners", "children", "grandchildren"]
+  .reduce((n, k) => n + fam[k].length, 0) : 0;
 
 function renderFamilyTree(id) {
   const fam = buildFamilyTree(id);
   const body = $("famBody");
   if (!fam) { body.innerHTML = `<div class="fam-empty">Person not found.</div>`; return; }
   $("famModalTitle").textContent = `${fam.person.name} — family tree`;
-  const rows = [
-    ["Grandparents", fam.grandparents.map(p => famNodeHtml(p))],
-    ["Parents", fam.parents.map(p => famNodeHtml(p))],
-    ["Family", [...fam.siblings.map(p => famNodeHtml(p)), famNodeHtml(fam.person, true), ...fam.partners.map(p => famNodeHtml(p))]],
-    ["Children", fam.children.map(p => famNodeHtml(p))],
-    ["Grandchildren", fam.grandchildren.map(p => famNodeHtml(p))],
-  ].filter(([, html]) => html.length);
-  body.innerHTML = rows.length > 1
-    ? rows.map(([label, html], i) =>
-        (i > 0 ? `<div class="fam-connector"></div>` : "") +
-        `<div class="fam-gen"><div class="fam-gen-label">${esc(label)}</div><div class="fam-row">${html.join("")}</div></div>`
-      ).join("")
-    : `<div class="fam-empty">No family links recorded for ${esc(fam.person.name)} yet.<br>Add a parent, child, sibling, or partner link from their record.</div>`;
+  body.innerHTML = famRowsHtml(fam)
+    || `<div class="fam-empty">No family links recorded for ${esc(fam.person.name)} yet.<br>Add a parent, child, sibling, or partner link from their record.</div>`;
   body.querySelectorAll("[data-fam-goto]").forEach(el => el.onclick = () => { closeFamModal(); select(Number(el.dataset.famGoto)); });
 }
 
@@ -1290,7 +1335,8 @@ function renderInsights() {
 const TREE_KINDS = new Set(["parent", "sibling", "partner"]);
 const TREE_ROW = 170;   // vertical distance between two generations, world units
 const TREE_COL = 76;    // horizontal distance between two people on the same row
-const TREE_GAP = 1.6;   // columns left between two couples/sibling sets on one row
+const TREE_GAP = 2.4;   // columns left between two sibling sets on one row
+const TREE_MATE_GAP = .3; // and between the two halves of a couple, who belong together
 const TREE_PAD = 3.2;   // columns left between two separate trees
 const TREE_BUS = 34;    // how far above a child row the horizontal "bus" of a parent link runs
 
@@ -1306,39 +1352,48 @@ function famLayout(edges) {
   const out = new Map();
   if (!ids.length) return out;
 
-  // 1. one generation, one group: partners and siblings are merged so a couple is never split
-  //    across rows and never gets a stranger wedged between them.
+  // 1. a group is a sibling set, and only a sibling set. Merging partners in as well is
+  //    transitive, so a spouse's whole family got spliced into yours: Solange's brothers and
+  //    sisters landed in the same unbroken run as Michel's own, which reads as one big family
+  //    (his words, 2026-08-13: "it looks like we're all related"). A couple is two groups side by
+  //    side instead, kept on the same row by the constraint in step 3.
   const par = new Map(ids.map(id => [id, id]));
   const find = x => { while (par.get(x) !== x) { par.set(x, par.get(par.get(x))); x = par.get(x); } return x; };
-  for (const e of fam) if (e.kind !== "parent") { const a = find(e.a), b = find(e.b); if (a !== b) par.set(a, b); }
+  for (const e of fam) if (e.kind === "sibling") { const a = find(e.a), b = find(e.b); if (a !== b) par.set(a, b); }
   const members = new Map();
   for (const id of ids) { const r = find(id); if (!members.has(r)) members.set(r, []); members.get(r).push(id); }
   const groups = [...members.keys()];
   const gi = new Map(groups.map((g, i) => [g, i]));
 
-  // 2. parent edges lifted onto groups, deduplicated
-  const up = groups.map(() => []), down = groups.map(() => []), pe = new Set();
+  // 2. parent and partner edges lifted onto groups, deduplicated
+  const up = groups.map(() => []), down = groups.map(() => []), mate = groups.map(() => []);
+  const pe = new Set();
   for (const e of fam) {
-    if (e.kind !== "parent") continue;
+    if (e.kind === "sibling") continue;
     const a = gi.get(find(e.a)), b = gi.get(find(e.b));
-    if (a === b || pe.has(a + ":" + b)) continue;   // same group = a contradiction in the data, not a generation
-    pe.add(a + ":" + b);
-    down[a].push(b); up[b].push(a);
+    if (a === b || pe.has(e.kind + a + ":" + b)) continue;   // same group = a contradiction in the data, not a generation
+    pe.add(e.kind + a + ":" + b);
+    if (e.kind === "parent") { down[a].push(b); up[b].push(a); }
+    else { mate[a].push(b); mate[b].push(a); }
   }
 
-  // 3. generation = longest path from the top. Relaxation rather than a topological sort, so a
-  //    cycle written by hand stretches the tree instead of hanging the page.
+  // 3. generation = longest path from the top, and a couple shares a row without sharing a
+  //    group. Relaxation rather than a topological sort, and both rules only ever push a group
+  //    down, so a cycle written by hand stretches the tree instead of hanging the page.
   const gen = groups.map(() => 0);
   for (let pass = 0; pass < groups.length; pass++) {
     let moved = false;
-    for (let a = 0; a < groups.length; a++) for (const b of down[a]) if (gen[b] < gen[a] + 1) { gen[b] = gen[a] + 1; moved = true; }
+    for (let a = 0; a < groups.length; a++) {
+      for (const b of down[a]) if (gen[b] < gen[a] + 1) { gen[b] = gen[a] + 1; moved = true; }
+      for (const b of mate[a]) if (gen[b] < gen[a]) { gen[b] = gen[a]; moved = true; }
+    }
     if (!moved) break;
   }
 
   // 4. one component per family
   const cp = groups.map((_, i) => i);
   const cfind = x => { while (cp[x] !== x) { cp[x] = cp[cp[x]]; x = cp[x]; } return x; };
-  for (let a = 0; a < groups.length; a++) for (const b of down[a]) { const ra = cfind(a), rb = cfind(b); if (ra !== rb) cp[ra] = rb; }
+  for (let a = 0; a < groups.length; a++) for (const b of down[a].concat(mate[a])) { const ra = cfind(a), rb = cfind(b); if (ra !== rb) cp[ra] = rb; }
   const comps = new Map();
   for (let i = 0; i < groups.length; i++) { const r = cfind(i); if (!comps.has(r)) comps.set(r, []); comps.get(r).push(i); }
 
@@ -1357,6 +1412,7 @@ function famLayout(edges) {
         const g = gen[i] - minGen;
         (rows[g] || (rows[g] = [])).push(i);
         for (let k = down[i].length - 1; k >= 0; k--) stack.push(down[i][k]);
+        for (const m of mate[i]) stack.push(m);   // last in, first out: a spouse lands beside them
       }
     };
     for (const i of list) if (!up[i].length) walk(i);
@@ -1374,7 +1430,11 @@ function famLayout(edges) {
         if (!row || row.length < 2) continue;
         const keyed = row.map((g, k) => {
           const rel = (downward ? up[g] : down[g]).map(o => pos.get(o)).filter(v => v !== undefined);
-          return { g, k, b: rel.length ? rel.reduce((x, y) => x + y, 0) / rel.length : k };
+          const b = rel.length ? rel.reduce((x, y) => x + y, 0) / rel.length : k;
+          // a spouse pulls too, or the sweep would happily park a couple at opposite ends of
+          // the row on the strength of their parents alone
+          const sp = mate[g].map(o => pos.get(o)).filter(v => v !== undefined);
+          return { g, k, b: sp.length ? (b + sp.reduce((x, y) => x + y, 0) / sp.length) / 2 : b };
         });
         keyed.sort((p, q) => p.b - q.b || p.k - q.k);
         row.length = 0; for (const x of keyed) row.push(x.g);
@@ -1391,9 +1451,12 @@ function famLayout(edges) {
     const lx = new Map(), rowOf = new Map(), off = rows.map(() => 0), rowW = rows.map(() => 0);
     rows.forEach((row, r) => {
       if (!row) return;
-      let cur = 0;
-      for (const g of row) { lx.set(g, cur); rowOf.set(g, r); cur += size(g) + TREE_GAP; }
-      rowW[r] = Math.max(cur - TREE_GAP, 0);
+      let cur = 0, prev = -1;
+      for (const g of row) {
+        if (prev >= 0) cur += mate[prev].includes(g) ? TREE_MATE_GAP : TREE_GAP;
+        lx.set(g, cur); rowOf.set(g, r); cur += size(g); prev = g;
+      }
+      rowW[r] = cur;
     });
     const mid = g => off[rowOf.get(g)] + lx.get(g) + size(g) / 2;
     for (let s = 0; s < 8; s++) {
@@ -1490,10 +1553,12 @@ function buildGraph() {
     const lay = famLayout(DATA.edges);
     for (const id of lay.keys()) addP(id);
     pinned.forEach(id => addP(id));
-    // family links only: a colleague edge between two cousins is true, and in this view it is a
-    // long diagonal across four generations that hides the tree it crosses
+    // Only the three kinds that place a person also draw one. Everything else — a colleague
+    // edge, or the generic "family" kind that ties two cousins together — is a long diagonal
+    // across four generations, hiding the tree it crosses and saying nothing the rows don't
+    // already say. His rule, 2026-08-13: "in the genealogy view, cousins should not have a link."
     DATA.edges.forEach(e => {
-      if (!TREE_KINDS.has(e.kind) && e.kind !== "family") return;
+      if (!TREE_KINDS.has(e.kind)) return;
       const x = idx.get("p" + e.a), y = idx.get("p" + e.b);
       if (x !== undefined && y !== undefined) links.push({ s: x, t: y, kind: e.kind, ea: e.a, eb: e.b });
     });
@@ -2104,13 +2169,35 @@ function renderDrawer(p) {
   if (!p) { d.innerHTML = ""; return; }
 
   const v = k => esc(p[k] != null ? p[k] : "");
-  const i = idx.get("p" + p.id);
+  // A person's links are read as a family and a set of categories, never as one pile. The graph's
+  // neighbour index only holds what is currently drawn, so the links come off DATA.edges instead:
+  // in tree mode a colleague edge is not drawn, and it still belongs on the record.
   const conn = [];
-  if (i !== undefined) neigh[i].forEach(([j, li]) => {
-    const l = links[li];
-    if (l.kind === "org") return;
-    conn.push({ id: nodes[j].id, label: nodes[j].label, kind: l.kind, a: l.ea, b: l.eb });
-  });
+  for (const e of DATA.edges) {
+    const other = e.a === p.id ? e.b : e.b === p.id ? e.a : null;
+    const q = other != null && byId.get(other);
+    if (q) conn.push({ id: q.id, label: q.name, kind: e.kind, a: e.a, b: e.b });
+  }
+  const fam = p.kind === "agent" ? null : buildFamilyTree(p.id);
+  const placed = new Set();
+  if (fam) for (const k of ["grandparents", "parents", "siblings", "partners", "children", "grandchildren"])
+    for (const q of fam[k]) placed.add(q.id);
+  const direct = new Map();
+  for (const c of conn) if (TREE_KINDS.has(c.kind) && !direct.has(c.id)) direct.set(c.id, c);
+  const famHtml = fam ? famRowsHtml(fam, direct) : "";
+  // a generic "family" link says they are related and nothing about how, so it cannot go on a
+  // row — it gets named under the tree rather than dropped
+  const vagueFam = conn.filter(c => FAMILY_KINDS.has(c.kind) && !placed.has(c.id));
+  const rest = conn.filter(c => !FAMILY_KINDS.has(c.kind));
+  const linkRow = (c, showKind = true) => `<div class="row-item">
+      <a class="lbl" data-goto="${c.id}">${showKind ? `<span class="k">${esc(edgeKindLabel(c, p.id))}</span> ` : ""}${esc(c.label)}</a>
+      <span class="x" data-de="${c.a}|${c.b}|${esc(c.kind)}">✕</span></div>`;
+  const grouped = LINK_GROUPS.map(g => [g.label, rest.filter(c => g.kinds.includes(c.kind)), g.kinds.length > 1]);
+  const known = new Set(LINK_GROUPS.flatMap(g => g.kinds));
+  grouped.push(["Other", rest.filter(c => !known.has(c.kind)), true]);
+  const linkGroupsHtml = grouped.filter(([, list]) => list.length).map(([label, list, showKind]) =>
+    `<div class="lgrp"><div class="lgrp-h">${esc(label)} <em class="k">${list.length}</em></div>${list.map(c => linkRow(c, showKind)).join("")}</div>`
+  ).join("");
 
   d.innerHTML = `
     <div class="dr-head">
@@ -2158,11 +2245,15 @@ function renderDrawer(p) {
         </div>
       </section>
 
-      <section class="blk"><h3>Direct links <em>${conn.length}</em></h3>
-        ${conn.length ? conn.map(c => `<div class="row-item">
-            <a class="lbl" data-goto="${c.id}"><span class="k">${esc(edgeKindLabel(c, p.id))}</span> ${esc(c.label)}</a>
-            <span class="x" data-de="${c.a}|${c.b}|${esc(c.kind)}">✕</span></div>`).join("")
-          : `<div class="none">no links recorded</div>`}
+      ${p.kind === "agent" ? "" : `
+      <section class="blk"><h3>Family <em>${famCount(fam)}</em></h3>
+        ${famHtml ? `<div class="fam-mini">${famHtml}</div>`
+          : `<div class="none">no family recorded</div>`}
+        ${vagueFam.length ? `<div class="lgrp"><div class="lgrp-h">Related, generation unknown</div>${vagueFam.map(linkRow).join("")}</div>` : ""}
+      </section>`}
+
+      <section class="blk"><h3>Links <em>${rest.length}</em></h3>
+        ${rest.length ? linkGroupsHtml : `<div class="none">no links recorded</div>`}
         <div class="add">
           <input id="et" list="people-dl" placeholder="person">
           <select id="ek" style="max-width:110px">${EDGE_ADD_KINDS.map(k => `<option>${k}</option>`).join("")}</select>
@@ -2249,6 +2340,10 @@ function renderDrawer(p) {
   wireMdExpand("xs", "Interaction note");
   d.querySelectorAll("[data-goto]").forEach(a => a.onclick = () => select(Number(a.dataset.goto)));
   d.querySelectorAll("[data-goto-org]").forEach(a => a.onclick = () => selectOrg(Number(a.dataset.gotoOrg)));
+  d.querySelectorAll("[data-fam-goto]").forEach(el => el.onclick = e => {
+    if (e.target.closest("[data-de]")) return;   // the cross deletes, it does not navigate
+    select(Number(el.dataset.famGoto));
+  });
   d.querySelectorAll("[data-copy]").forEach(btn => btn.onclick = async () => {
     try { await navigator.clipboard.writeText(btn.dataset.copy); toast("copied"); }
     catch { toast("copy failed — select the text manually", "err"); }
