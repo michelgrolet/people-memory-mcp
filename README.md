@@ -14,7 +14,7 @@ contact data, or credentials.
 - Maps people, organizations, relationships, affiliations, identifiers, facts, and interactions.
 - Gives Codex, Claude Code, and other MCP clients semantic tools plus guarded SQL.
 - Teaches the agent to look up names before answering and save durable facts during every chat.
-- Imports LinkedIn Connections, Google Contacts, and WhatsApp chat exports.
+- Imports LinkedIn Connections, Google Contacts, WhatsApp chat exports, and GEDCOM family trees.
 - Can enrich records through connectors the user approves, including Gmail, Calendar, and Drive.
 - Runs fully local with Supabase CLI or in the cloud with any PostgreSQL database.
 - Recommends a free Supabase project because it includes Postgres, Auth, REST, and a local stack.
@@ -173,6 +173,25 @@ uv run people-memory import whatsapp ~/Downloads/chat.txt --self-name "Your Name
 Imports resolve email or phone first, then name. They fill missing values and never overwrite a
 conflict silently. The `import-contacts` skill can inspect unfamiliar CSV columns and guide the user
 through ambiguous matches.
+
+### Family trees (GEDCOM)
+
+A genealogy export carries something no contact export has: who is whose parent, who married whom,
+and who the siblings are. Open the web app, click the upload button in the header, and drop a `.ged`
+file from Geneanet, Ancestry, MyHeritage or Gramps.
+
+A GEDCOM has no email and no phone, so the dedup key the other importers rely on does not exist:
+identity is resolved on name and birth date, and a woman recorded under her maiden name is also
+matched against her spouses' surnames. Anything those cannot settle — the same name on two records,
+a birth date that contradicts a name match, two entries in the file that may be one person — is
+listed on a review screen and nothing is written until every one of them is answered. Rerunning the
+same file writes nothing the second time.
+
+What lands: a person per individual (full birth dates in the column, partial or hedged ones as a
+`born` fact), `parent` / `partner` / `sibling` links, and `birth_place`, `died`, `death_place`,
+`occupation` facts. A link that already exists is left untouched, notes included.
+
+### LinkedIn, live
 
 LinkedIn also exposes 1st-degree connections live through its Member Data Portability API (DMA).
 Once you hold an OAuth token with the `r_dma_portability_self_serve` scope (see

@@ -511,6 +511,64 @@
   .fam-connector{width:1px;height:14px;background:var(--line2)}
   .fam-empty{text-align:center;color:var(--muted);font-size:13px;padding:30px 0}
 
+  /* ── GEDCOM import modal ─────────────────────────────── */
+  #gedScrim{
+    position:fixed;inset:0;z-index:92;background:rgba(6,7,9,.68);
+    backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity 180ms var(--ease);
+  }
+  #gedScrim.open{opacity:1;pointer-events:auto}
+  #gedModal{
+    position:fixed;z-index:93;top:5vh;left:50%;width:min(860px,calc(100% - 28px));height:min(86vh,820px);
+    transform:translate(-50%,-10px) scale(.985);opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line2);border-radius:var(--r-lg);
+    box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;
+    transition:opacity 180ms var(--ease),transform 220ms var(--ease);
+  }
+  #gedModal.open{opacity:1;transform:translate(-50%,0) scale(1);pointer-events:auto}
+  .ged-body{flex:1;overflow-y:auto;padding:18px 20px}
+  .ged-foot{
+    display:flex;align-items:center;gap:12px;padding:11px 16px;border-top:1px solid var(--line);
+    flex:0 0 auto;background:var(--bg2);
+  }
+  .ged-foot .ged-tally{flex:1;min-width:0;font-size:12px;color:var(--txt2);line-height:1.45}
+  .ged-drop{
+    border:1.5px dashed var(--line2);border-radius:var(--r-lg);padding:40px 26px;text-align:center;
+    cursor:pointer;transition:border-color 140ms var(--ease),background 140ms var(--ease);
+  }
+  .ged-drop:hover,.ged-drop.over{border-color:var(--accent);background:var(--accent-dim)}
+  .ged-drop h5{font:600 14px/1.3 var(--font);margin-bottom:7px}
+  .ged-drop p{font-size:12.5px;color:var(--txt2);line-height:1.6;max-width:52ch;margin:0 auto}
+  .ged-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .ged-tab{
+    padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface2);
+    color:var(--txt2);font-size:12px;cursor:pointer;white-space:nowrap;
+  }
+  .ged-tab:hover{border-color:var(--line2);color:var(--txt)}
+  .ged-tab.on{background:var(--accent);border-color:var(--accent);color:var(--bg);font-weight:600}
+  .ged-tab b{font-variant-numeric:tabular-nums}
+  .ged-search{width:100%;margin-bottom:10px}
+  .ged-row{
+    display:flex;align-items:center;gap:10px;padding:8px 2px;border-top:1px solid var(--line);
+  }
+  .ged-row:first-child{border-top:none}
+  .ged-row.todo{background:linear-gradient(90deg,var(--accent-dim),transparent 60%)}
+  .ged-who{flex:1 1 40%;min-width:0}
+  .ged-who .n{font-size:13px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ged-who .d{font-size:11.5px;color:var(--muted);margin-top:1px;font-variant-numeric:tabular-nums}
+  .ged-row select{flex:1 1 46%;min-width:0;max-width:420px}
+  .ged-why{flex:0 0 auto;font-size:11px;color:var(--muted);max-width:22ch;text-align:right}
+  .ged-none{text-align:center;color:var(--muted);font-size:13px;padding:34px 0}
+  .ged-bar{height:5px;border-radius:999px;background:var(--surface3);overflow:hidden;margin:14px 0 10px}
+  .ged-bar i{display:block;height:100%;background:var(--accent);width:0;transition:width 200ms linear}
+  .ged-log{font:12px/1.7 var(--mono);color:var(--txt2);white-space:pre-wrap;word-break:break-word}
+  @media (max-width:640px){
+    #gedModal{top:0;left:0;transform:none;width:100%;height:100%;border-radius:0}
+    #gedModal.open{transform:none}
+    .ged-row{flex-wrap:wrap}
+    .ged-who,.ged-row select{flex:1 1 100%;max-width:none}
+    .ged-why{text-align:left;max-width:none}
+  }
+
   /* ── sync status popover ─────────────────────────────── */
   .sync-row{display:flex;align-items:center;gap:9px;padding:8px 2px}
   .sync-row+.sync-row{border-top:1px solid var(--line)}
@@ -572,6 +630,9 @@
     <button class="btn btn-primary" id="newBtn" title="New person (⌘⇧N)">
       <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
       Person
+    </button>
+    <button class="btn btn-ghost btn-icon" id="gedBtn" title="Import a family tree (GEDCOM)">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
     </button>
     <button class="btn btn-ghost btn-icon" id="insightsBtn" title="Insights">
       <svg class="icon" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
@@ -695,6 +756,22 @@
   </div>
   <div class="fam-body" id="famBody"></div>
 </div>
+
+<div id="gedScrim"></div>
+<div id="gedModal" role="dialog" aria-modal="true" aria-labelledby="gedModalTitle">
+  <div class="md-modal-head">
+    <h4 id="gedModalTitle">Import a family tree</h4>
+    <button class="btn btn-ghost btn-icon" id="gedClose" title="Close (esc)">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="ged-body" id="gedBody"></div>
+  <div class="ged-foot">
+    <div class="ged-tally" id="gedTally"></div>
+    <button class="btn" id="gedBack" hidden>Back</button>
+    <button class="btn btn-primary" id="gedGo" hidden>Import</button>
+  </div>
+</div>
+<input type="file" id="gedFile" accept=".ged,.gedcom,text/plain" hidden>
 
 <div id="tooltip"></div>
 <div id="toasts"></div>
@@ -2297,11 +2374,589 @@ function renderActiveFilters() {
   });
 }
 
+// ── GEDCOM import ───────────────────────────────────────────────────────────
+// A genealogy export (Geneanet, Ancestry, Gramps…) carries family links nothing else can give
+// this graph. It also carries no email and no phone, so the dedup key every other importer leans
+// on does not exist here: matching is name plus birth date, and whatever those two cannot settle
+// becomes a question on the review screen. Nothing is written before the human answers all of it.
+
+const GED_MONTH = { JAN:"01", FEB:"02", MAR:"03", APR:"04", MAY:"05", JUN:"06",
+                    JUL:"07", AUG:"08", SEP:"09", OCT:"10", NOV:"11", DEC:"12" };
+const gnorm = s => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+  .replace(/[^a-z0-9]+/g, " ").trim();
+// GeneWeb writes an unknown surname as a bare "x" or "?"; that is no surname at all.
+const GED_UNKNOWN_SURNAME = new Set(["x", "?", "n", "nn", "inconnu", "inconnue", ""]);
+
+// An all-caps surname is an export convention, not how the name is written. Lower it, then
+// re-capitalise each part, so GROLET becomes Grolet. A mixed-case surname is left untouched.
+function gedFixCase(s) {
+  if (!s) return "";
+  if (s !== s.toUpperCase()) return s;
+  return s.toLowerCase().replace(/(^|[\s'’\-])(\p{L})/gu, (_, sep, ch) => sep + ch.toUpperCase());
+}
+
+// A GEDCOM date is often partial ("1961") or hedged ("ABT 1885"). Keep the ISO prefix the
+// partial-date columns accept, and keep the original text as what a person reads on the card.
+function gedDate(raw) {
+  if (!raw) return null;
+  const display = raw.trim();
+  if (!display || display.toUpperCase() === "Y") return null;
+  let v = display.toUpperCase().replace(/[()]/g, " ").trim();
+  let approx = false;
+  const q = /^(ABT|EST|CAL|BEF|AFT|FROM|BET)\s+/.exec(v);
+  if (q) { approx = true; v = v.slice(q[0].length); }
+  v = v.replace(/\s+(AND|TO)\s+.*$/, "").trim();     // "BET 1830 AND 1840" keeps the first bound
+  let m = /^(\d{1,2})\s+([A-Z]{3})\s+(\d{3,4})$/.exec(v);
+  if (m && GED_MONTH[m[2]]) {
+    return { iso: `${m[3].padStart(4,"0")}-${GED_MONTH[m[2]]}-${m[1].padStart(2,"0")}`,
+             precision: "day", approx, display };
+  }
+  m = /^([A-Z]{3})\s+(\d{3,4})$/.exec(v);
+  if (m && GED_MONTH[m[1]]) {
+    return { iso: `${m[2].padStart(4,"0")}-${GED_MONTH[m[1]]}`, precision: "month", approx, display };
+  }
+  m = /^(\d{3,4})$/.exec(v);
+  if (m) return { iso: m[1].padStart(4,"0"), precision: "year", approx, display };
+  return { iso: null, precision: null, approx, display };
+}
+
+function gedParse(text) {
+  const root = [], stack = [];
+  for (const raw of String(text).replace(/\r\n?/g, "\n").split("\n")) {
+    const m = /^\s*(\d+)\s+(?:(@[^@]*@)\s+)?(\S+)(?:\s(.*))?$/.exec(raw);
+    if (!m) continue;
+    const level = +m[1];
+    const node = { xref: m[2] || null, tag: m[3], val: m[4] ?? "", kids: [] };
+    if (level === 0) { root.push(node); stack.length = 0; stack.push(node); continue; }
+    while (stack.length > level) stack.pop();
+    if (!stack.length) continue;
+    if (node.tag === "CONT" || node.tag === "CONC") {     // a value continued on the next line
+      const parent = stack[stack.length - 1];
+      parent.val += (node.tag === "CONT" ? "\n" : "") + node.val;
+      continue;
+    }
+    stack[stack.length - 1].kids.push(node);
+    stack.push(node);
+  }
+  const kid = (n, tag) => n && n.kids.find(k => k.tag === tag);
+  const kidVal = (n, tag) => { const k = kid(n, tag); const v = k && k.val.trim(); return v || null; };
+  // "1 DEAT Y" is a death with neither date nor place — still a fact, so an event records that it
+  // happened at all, separately from whatever is known about when and where.
+  const event = n => {
+    if (!n) return null;
+    const d = gedDate(kidVal(n, "DATE"));
+    return { known: true, iso: d?.iso ?? null, precision: d?.precision ?? null,
+             approx: d?.approx ?? false, display: d?.display ?? null, place: kidVal(n, "PLAC") };
+  };
+  const dated = (...events) => events.find(e => e && e.iso) || events.find(Boolean) || null;
+
+  const individuals = [], families = [];
+  for (const n of root) {
+    if (n.tag === "INDI") {
+      const raw = kidVal(n, "NAME") || "";
+      const parts = /^(.*?)\s*\/([^/]*)\/\s*(.*)$/.exec(raw);
+      const given = (parts ? parts[1] : raw).trim();
+      let surname = parts ? parts[2].trim() : "";
+      if (GED_UNKNOWN_SURNAME.has(surname.toLowerCase())) surname = "";
+      surname = gedFixCase(surname);
+      const name = [given, surname].filter(Boolean).join(" ").trim();
+      if (!name) continue;
+      individuals.push({
+        xref: n.xref, given, surname, name, sex: kidVal(n, "SEX"),
+        birth: dated(event(kid(n, "BIRT")), event(kid(n, "BAPM"))),
+        death: event(kid(n, "DEAT")),
+        occupation: kidVal(n, "OCCU"), note: kidVal(n, "NOTE"),
+        famc: n.kids.filter(k => k.tag === "FAMC").map(k => k.val.trim()).filter(Boolean),
+        fams: n.kids.filter(k => k.tag === "FAMS").map(k => k.val.trim()).filter(Boolean),
+      });
+    } else if (n.tag === "FAM") {
+      families.push({
+        xref: n.xref, husb: kidVal(n, "HUSB"), wife: kidVal(n, "WIFE"),
+        chil: n.kids.filter(k => k.tag === "CHIL").map(k => k.val.trim()).filter(Boolean),
+        marr: event(kid(n, "MARR")),
+      });
+    }
+  }
+  return { individuals, families };
+}
+
+function gedDice(a, b) {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const grams = s => {
+    const m = new Map();
+    for (let i = 0; i < s.length - 1; i++) { const g = s.slice(i, i + 2); m.set(g, (m.get(g) || 0) + 1); }
+    return m;
+  };
+  const A = grams(a), B = grams(b);
+  let hit = 0, total = 0;
+  for (const [g, n] of A) { total += n; hit += Math.min(n, B.get(g) || 0); }
+  for (const [, n] of B) total += n;
+  return total ? (2 * hit) / total : 0;
+}
+
+// -1 conflict, 0 unknown, 1 agreement — compared at the coarser of the two precisions, because a
+// GEDCOM "1963" and a stored "1963-08-27" are the same fact at two resolutions. A hedged date
+// contradicts nothing; it is an estimate by definition.
+function gedBirthAgrees(birth, birthdate) {
+  if (!birth || !birth.iso || !birthdate) return 0;
+  const n = Math.min(birth.iso.length, String(birthdate).length);
+  const a = birth.iso.slice(0, n), b = String(birthdate).slice(0, n);
+  if (a === b) return 1;
+  return birth.approx ? 0 : -1;
+}
+
+// Genealogy files repeat names on purpose: a son carries his father's, a wife shares her
+// sister-in-law's. Two records are only a possible duplicate when nothing in the file separates
+// them — not a family tie, not a line of descent, not a birth year.
+function gedFileDuplicates(individuals, families) {
+  const famBy = new Map(families.map(f => [f.xref, f]));
+  const indBy = new Map(individuals.map(i => [i.xref, i]));
+  const parentsOfX = x => {
+    const i = indBy.get(x); if (!i) return [];
+    return i.famc.flatMap(fx => { const f = famBy.get(fx); return f ? [f.husb, f.wife].filter(Boolean) : []; });
+  };
+  const isAncestorOf = (a, b) => {
+    const seen = new Set(); let front = [b];
+    for (let depth = 0; depth < 20 && front.length; depth++) {
+      const next = [];
+      for (const x of front) for (const p of parentsOfX(x)) {
+        if (p === a) return true;
+        if (!seen.has(p)) { seen.add(p); next.push(p); }
+      }
+      front = next;
+    }
+    return false;
+  };
+  const tied = (a, b) => {
+    for (const fx of new Set([...a.famc, ...a.fams, ...b.famc, ...b.fams])) {
+      const f = famBy.get(fx); if (!f) continue;
+      const parents = [f.husb, f.wife].filter(Boolean), kids = f.chil, pair = [a.xref, b.xref];
+      if (pair.every(x => parents.includes(x))) return true;                 // married to each other
+      if (pair.every(x => kids.includes(x))) return true;                    // siblings
+      if (parents.includes(a.xref) && kids.includes(b.xref)) return true;    // parent and child
+      if (parents.includes(b.xref) && kids.includes(a.xref)) return true;
+    }
+    return false;
+  };
+  const groups = new Map();
+  for (const i of individuals) {
+    const k = gnorm(i.name);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(i);
+  }
+  const pairs = [];
+  for (const [, g] of groups) {
+    if (g.length < 2) continue;
+    for (let x = 0; x < g.length; x++) for (let y = x + 1; y < g.length; y++) {
+      const a = g[x], b = g[y];
+      if (tied(a, b)) continue;
+      if (isAncestorOf(a.xref, b.xref) || isAncestorOf(b.xref, a.xref)) continue;
+      if (a.famc.length && b.famc.length && a.famc.join() !== b.famc.join()) continue;
+      const ya = a.birth?.iso?.slice(0, 4), yb = b.birth?.iso?.slice(0, 4);
+      if (ya && yb && ya !== yb) continue;
+      pairs.push([a, b]);
+    }
+  }
+  return pairs;
+}
+
+const GED_REASON_BASE = { name: 0.80, married: 0.58, similar: 0.42 };
+
+function gedMatch(individuals, families, people) {
+  const famBy = new Map(families.map(f => [f.xref, f]));
+  const indBy = new Map(individuals.map(i => [i.xref, i]));
+  const byName = new Map(), byGiven = new Map(), bySurname = new Map();
+  for (const p of people) {
+    const nn = gnorm(p.name);
+    if (!byName.has(nn)) byName.set(nn, []);
+    byName.get(nn).push(p);
+    const tok = nn.split(" ").filter(Boolean);
+    for (const [map, t] of [[byGiven, tok[0]], [bySurname, tok[tok.length - 1]]]) {
+      if (!t) continue;
+      if (!map.has(t)) map.set(t, []);
+      map.get(t).push(p);
+    }
+  }
+  const rows = individuals.map(ind => {
+    const seen = new Map();
+    const add = (person, reason, sim) => {
+      const base = GED_REASON_BASE[reason] * (reason === "similar" ? sim : 1);
+      const birth = gedBirthAgrees(ind.birth, person.birthdate);
+      const score = Math.max(0, base + (birth === 1 ? 0.35 : birth === -1 ? -0.9 : 0));
+      const prev = seen.get(person.id);
+      if (!prev || score > prev.score) seen.set(person.id, { person, reason, birth, score, sim });
+    };
+    for (const p of byName.get(gnorm(ind.name)) || []) add(p, "name", 1);
+    // A woman recorded under her maiden name in the tree is usually stored under her married name
+    // in the graph, so try each spouse's surname too.
+    for (const fx of ind.fams) {
+      const fam = famBy.get(fx); if (!fam) continue;
+      const other = indBy.get(fam.husb === ind.xref ? fam.wife : fam.husb);
+      if (!other || !other.surname) continue;
+      for (const p of byName.get(gnorm(`${ind.given} ${other.surname}`)) || []) add(p, "married", 1);
+    }
+    const nn = gnorm(ind.name), tok = nn.split(" ").filter(Boolean);
+    for (const p of new Set([...(byGiven.get(tok[0]) || []), ...(bySurname.get(tok[tok.length - 1]) || [])])) {
+      const sim = gedDice(nn, gnorm(p.name));
+      if (sim >= 0.78) add(p, "similar", sim);
+    }
+    return { xref: ind.xref, ind, candidates: [...seen.values()].sort((a, b) => b.score - a.score),
+             action: null, targetId: null, mergeInto: null, dupWith: [], why: "" };
+  });
+
+  const wants = new Map();
+  for (const r of rows) {
+    const exact = r.candidates.filter(c => c.reason === "name" && c.birth !== -1);
+    const rival = r.candidates.filter(c => !exact.includes(c) && c.score >= 0.5);
+    // A birth date contradicting a name match usually means one of the two records is wrong, not
+    // that there are two people — so it is a question, never a second record created quietly.
+    const clash = r.candidates.some(c => c.reason !== "similar" && c.birth === -1);
+    if (exact.length === 1 && !rival.length && !clash) {
+      r.action = "link"; r.targetId = exact[0].person.id;
+      r.why = exact[0].birth === 1 ? "same name, same birth date" : "same name";
+      if (!wants.has(r.targetId)) wants.set(r.targetId, []);
+      wants.get(r.targetId).push(r);
+    } else if (!r.candidates.some(c => c.reason !== "similar" || c.score >= 0.5)) {
+      r.action = "create"; r.why = "no one close in the graph";
+    } else {
+      r.action = "review";
+      r.why = exact.length > 1 ? "several people share this name"
+            : clash ? "same name, different birth date" : "a close name already exists";
+    }
+  }
+  // Two people from one file can never resolve to the same record.
+  for (const [, claimants] of wants) {
+    if (claimants.length < 2) continue;
+    for (const r of claimants) { r.action = "review"; r.targetId = null;
+      r.why = "two people in this file match the same record"; }
+  }
+  const byXref = new Map(rows.map(r => [r.xref, r]));
+  for (const [a, b] of gedFileDuplicates(individuals, families)) {
+    for (const [self, other] of [[a, b], [b, a]]) {
+      const r = byXref.get(self.xref); if (!r) continue;
+      r.dupWith.push(other.xref);
+      if (r.action === "create") { r.action = "review"; r.why = "possible duplicate inside the file"; }
+    }
+  }
+  return rows;
+}
+
+// Everything the import would write, built before a single request goes out, so the review screen
+// and the writer read the exact same plan.
+function gedBuildWrites(rows, families, people, existingEdges = []) {
+  const byXref = new Map(rows.map(r => [r.xref, r]));
+  const owner = x => {                                   // xref -> the row that owns its record
+    let r = byXref.get(x);
+    for (let hop = 0; r && r.mergeInto && hop < 8; hop++) r = byXref.get(r.mergeInto);
+    return r && r.action !== "skip" && r.action !== "review" ? r : null;
+  };
+  for (const r of rows) r.merged = [];
+  for (const r of rows) {
+    if (!r.mergeInto) continue;
+    const into = owner(r.xref);
+    if (into && into !== r) into.merged.push(r.ind);
+  }
+  const personById = new Map(people.map(p => [p.id, p]));
+  const known = new Set();
+  for (const p of people) for (const f of p.facts || [])
+    known.add(`${p.id}|${f.key}|${f.value ?? ""}|${f.date ?? ""}`);
+
+  const creates = [], updates = [], facts = [], seenFact = new Set();
+  for (const r of rows) {
+    if (r.action !== "create" && r.action !== "link") continue;
+    const sources = [r.ind, ...r.merged];
+    const pick = key => sources.map(s => s[key]).find(e => e && e.iso)
+                     || sources.map(s => s[key]).find(Boolean) || null;
+    const birth = pick("birth"), death = pick("death");
+    const exact = birth && birth.precision === "day" && !birth.approx ? birth.iso : null;
+
+    if (r.action === "create") {
+      creates.push({ row: r, values: { full_name: r.ind.name, first_name: r.ind.given || null,
+                                       last_name: r.ind.surname || null, birthdate: exact } });
+    } else {
+      const existing = personById.get(r.targetId);
+      if (exact && existing && !existing.birthdate) updates.push({ row: r, birthdate: exact });
+    }
+    const push = (key, value, date) => {
+      if (!value) return;
+      const dedupe = `${r.xref}|${key}|${value}|${date ?? ""}`;
+      if (seenFact.has(dedupe)) return;
+      seenFact.add(dedupe);
+      facts.push({ row: r, key, value: String(value), date: date || null });
+    };
+    // A birth date that fits the typed column needs no fact; a partial or hedged one only lives here.
+    if (birth && birth.iso && !exact) push("born", birth.display, birth.iso);
+    for (const s of sources) {
+      if (s.birth?.place) push("birth_place", s.birth.place, birth?.iso || null);
+      if (s.death?.place) push("death_place", s.death.place, death?.iso || null);
+      if (s.occupation) push("occupation", s.occupation, null);
+      if (s.note) push("note", s.note.replace(/\s+/g, " ").trim(), null);
+    }
+    if (death) push("died", death.display || "yes", death.iso);
+  }
+
+  const SYMMETRIC = new Set(["partner", "sibling"]);
+  // A link that is already recorded is left exactly as it is. Rewriting it would replace a note
+  // Michel wrote by hand ("frère de Michel, confirmé le…") with this importer's empty one.
+  const already = new Set();
+  for (const e of existingEdges) {
+    already.add(`${e.a}|${e.b}|${e.kind}`);
+    if (SYMMETRIC.has(e.kind)) already.add(`${e.b}|${e.a}|${e.kind}`);
+  }
+  const edges = new Map();
+  const link = (aX, bX, kind, extra) => {
+    let a = owner(aX), b = owner(bX);
+    if (!a || !b || a === b) return;
+    if (SYMMETRIC.has(kind) && (a.xref > b.xref)) [a, b] = [b, a];  // the DB canonicalizes too
+    if (a.targetId && b.targetId && already.has(`${a.targetId}|${b.targetId}|${kind}`)) return;
+    const key = `${a.xref}|${b.xref}|${kind}`;
+    if (!edges.has(key)) edges.set(key, { a, b, kind, ...extra });
+  };
+  for (const f of families) {
+    const parents = [f.husb, f.wife].filter(Boolean);
+    if (parents.length === 2) link(parents[0], parents[1], "partner", {
+      since: f.marr?.iso || null,
+      note: f.marr?.place ? `married in ${f.marr.place}` : (f.marr?.display ? "married" : null),
+    });
+    for (const p of parents) for (const c of f.chil) link(p, c, "parent", {});
+    for (let i = 0; i < f.chil.length; i++)
+      for (let j = i + 1; j < f.chil.length; j++) link(f.chil[i], f.chil[j], "sibling", {});
+  }
+  return { creates, updates, facts: facts.filter(f => f.row.action === "create"
+             || !known.has(`${f.row.targetId}|${f.key}|${f.value}|${f.date ?? ""}`)),
+           edges: [...edges.values()] };
+}
+
+// ── the import screen ───────────────────────────────────────────────────────
+let GED = null, gedOpen = false;
+
+function openGedModal() {
+  $("gedScrim").classList.add("open"); $("gedModal").classList.add("open");
+  gedOpen = true;
+  if (!GED) gedShowPicker();
+}
+function closeGedModal() {
+  $("gedScrim").classList.remove("open"); $("gedModal").classList.remove("open");
+  gedOpen = false;
+}
+function gedShowPicker() {
+  GED = null;
+  $("gedBack").hidden = true; $("gedGo").hidden = true;
+  $("gedTally").textContent = "";
+  $("gedBody").innerHTML = `
+    <div class="ged-drop" id="gedDrop">
+      <h5>Drop a GEDCOM file here, or click to choose one</h5>
+      <p>A <code>.ged</code> export from Geneanet, Ancestry, MyHeritage or Gramps. Everyone in it is
+      matched against the people you already have, by name and birth date. You review every match
+      before anything is written, so nobody gets a second record.</p>
+    </div>`;
+  const drop = $("gedDrop");
+  drop.onclick = () => $("gedFile").click();
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = e => {
+    e.preventDefault(); drop.classList.remove("over");
+    const file = e.dataTransfer.files[0];
+    if (file) gedRead(file);
+  };
+}
+async function gedRead(file) {
+  let text;
+  try { text = await file.text(); }
+  catch (e) { toast(e.message, "err"); return; }
+  const { individuals, families } = gedParse(text);
+  if (!individuals.length) { toast("No individuals found in that file.", "err"); return; }
+  const rows = gedMatch(individuals, families, DATA.people);
+  GED = { file: file.name, individuals, families, rows, byXref: new Map(rows.map(r => [r.xref, r])),
+          tab: "todo", query: "" };
+  if (!rows.some(r => r.action === "review")) GED.tab = "all";
+  gedRenderReview();
+}
+
+const gedWhen = ind => [
+  ind.birth?.display ? `born ${ind.birth.display}` : ind.birth?.place ? "born" : "",
+  ind.death?.display ? `died ${ind.death.display}` : ind.death?.place ? "died" : "",
+].filter(Boolean).join(" · ");
+
+function gedRowValue(r) {
+  if (r.action === "create") return "create";
+  if (r.action === "link") return `link:${r.targetId}`;
+  if (r.action === "merge") return `merge:${r.mergeInto}`;
+  if (r.action === "skip") return "skip";
+  return "";
+}
+function gedRowOptions(r) {
+  const out = [];
+  if (r.action === "review") out.push(["", "Choose what to do…"]);
+  out.push(["create", "Create a new record"]);
+  for (const c of r.candidates.slice(0, 8)) {
+    const b = c.person.birthdate ? `, born ${c.person.birthdate}` : "";
+    const flag = c.birth === -1 ? " — birth dates differ" : c.reason === "married" ? " — married name" : "";
+    out.push([`link:${c.person.id}`, `Link to ${c.person.name}${b}${flag}`]);
+  }
+  for (const x of r.dupWith) {
+    const other = GED.byXref.get(x);
+    if (other && other.action !== "merge") out.push([`merge:${x}`, `Same person as ${other.ind.name} in this file — merge them`]);
+  }
+  out.push(["skip", "Skip, do not import"]);
+  return out;
+}
+function gedSetRow(r, value) {
+  r.mergeInto = null;
+  if (value === "") { r.action = "review"; r.targetId = null; }
+  else if (value === "create") { r.action = "create"; r.targetId = null; }
+  else if (value === "skip") { r.action = "skip"; r.targetId = null; }
+  else if (value.startsWith("link:")) { r.action = "link"; r.targetId = +value.slice(5); }
+  else if (value.startsWith("merge:")) {
+    r.action = "merge"; r.targetId = null; r.mergeInto = value.slice(6);
+    const into = GED.byXref.get(r.mergeInto);
+    // Two records cannot merge into each other; the one being merged away gives up its own merge.
+    if (into && into.mergeInto === r.xref) { into.mergeInto = null; into.action = "create"; }
+    if (into && into.action === "review") { into.action = "create"; }
+  }
+}
+
+function gedRenderReview() {
+  const rows = GED.rows;
+  const n = a => rows.filter(r => r.action === a).length;
+  const tabs = [
+    ["todo", "Needs you", rows.filter(r => r.action === "review").length],
+    ["create", "New people", n("create")],
+    ["link", "Linked", n("link")],
+    ["other", "Merged or skipped", n("merge") + n("skip")],
+    ["all", "Everyone", rows.length],
+  ];
+  const q = gnorm(GED.query);
+  const shown = rows.filter(r => {
+    if (q && !gnorm(r.ind.name).includes(q)) return false;
+    if (GED.tab === "all") return true;
+    if (GED.tab === "todo") return r.action === "review";
+    if (GED.tab === "other") return r.action === "merge" || r.action === "skip";
+    return r.action === GED.tab;
+  });
+
+  $("gedBody").innerHTML = `
+    <div class="ged-tabs">${tabs.map(([k, label, count]) =>
+      `<button class="ged-tab${GED.tab === k ? " on" : ""}" data-tab="${k}">${esc(label)} <b>${count}</b></button>`).join("")}</div>
+    <input class="ged-search" id="gedQ" placeholder="Filter by name…" value="${esc(GED.query)}">
+    <div id="gedRows">${shown.length ? shown.map(r => `
+      <div class="ged-row${r.action === "review" ? " todo" : ""}">
+        <div class="ged-who">
+          <div class="n">${esc(r.ind.name)}</div>
+          <div class="d">${esc(gedWhen(r.ind)) || "no dates"}</div>
+        </div>
+        <select data-x="${esc(r.xref)}">${gedRowOptions(r).map(([v, t]) =>
+          `<option value="${esc(v)}"${gedRowValue(r) === v ? " selected" : ""}>${esc(t)}</option>`).join("")}</select>
+        <span class="ged-why">${esc(r.why)}</span>
+      </div>`).join("") : `<div class="ged-none">Nothing here.</div>`}</div>`;
+
+  $("gedBody").querySelectorAll("[data-tab]").forEach(b =>
+    b.onclick = () => { GED.tab = b.dataset.tab; gedRenderReview(); });
+  const search = $("gedQ");
+  search.oninput = () => {
+    GED.query = search.value;
+    const at = search.selectionStart;
+    gedRenderReview();
+    const again = $("gedQ"); again.focus(); again.setSelectionRange(at, at);
+  };
+  $("gedBody").querySelectorAll("select[data-x]").forEach(sel =>
+    sel.onchange = () => { gedSetRow(GED.byXref.get(sel.dataset.x), sel.value); gedRenderReview(); });
+
+  const plan = gedBuildWrites(rows, GED.families, DATA.people, DATA.edges);
+  const todo = rows.filter(r => r.action === "review").length;
+  GED.plan = plan;
+  $("gedBack").hidden = false;
+  $("gedGo").hidden = false;
+  $("gedGo").disabled = todo > 0 || !(plan.creates.length + plan.updates.length + plan.facts.length + plan.edges.length);
+  $("gedGo").textContent = todo ? `${todo} left to answer` : "Import";
+  $("gedTally").innerHTML = todo
+    ? `<b>${todo}</b> ${todo === 1 ? "person needs" : "people need"} your decision before anything is written.`
+    : `${plan.creates.length} new ${plan.creates.length === 1 ? "person" : "people"}, `
+      + `${n("link")} linked to records you already have, ${n("merge") + n("skip")} merged or skipped `
+      + `— plus ${plan.edges.length} family links and ${plan.facts.length} facts.`;
+}
+
+async function gedApply() {
+  const plan = GED.plan;
+  const go = $("gedGo"), back = $("gedBack");
+  go.disabled = true; back.disabled = true;
+  const total = plan.creates.length + plan.updates.length + plan.facts.length + plan.edges.length;
+  let done = 0;
+  $("gedBody").innerHTML = `<div class="ged-bar"><i id="gedProg"></i></div><div class="ged-log" id="gedLog"></div>`;
+  const log = msg => { $("gedLog").textContent += msg + "\n"; };
+  const step = k => { done += k; $("gedProg").style.width = `${Math.round(100 * done / Math.max(total, 1))}%`; };
+  const chunks = (list, size) => { const out = []; for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size)); return out; };
+  const chk = r => { if (r.error) throw new Error(r.error.message); return r; };
+
+  try {
+    for (const batch of chunks(plan.creates, 100)) {
+      const { data } = chk(await sb.from("people").insert(batch.map(c => c.values)).select("id,full_name"));
+      // Identity ids are handed out in row order inside one INSERT, so position maps back — but a
+      // silent reordering would attach every fact and every link to the wrong person, so check.
+      if (data.length !== batch.length) throw new Error("The database returned a different number of people than were sent.");
+      batch.forEach((c, i) => {
+        if (data[i].full_name !== c.values.full_name)
+          throw new Error(`Rows came back out of order (${data[i].full_name} where ${c.values.full_name} was expected). Nothing further was written.`);
+        c.row._id = data[i].id;
+      });
+      step(batch.length);
+    }
+    log(`${plan.creates.length} people created`);
+
+    for (const u of plan.updates) {
+      chk(await sb.from("people").update({ birthdate: u.birthdate }).eq("id", u.row.targetId));
+      step(1);
+    }
+    if (plan.updates.length) log(`${plan.updates.length} birth dates filled in`);
+
+    const idOf = row => row._id ?? row.targetId;
+    const factRows = plan.facts.map(f => ({ person_id: idOf(f.row), key: f.key, value: f.value,
+                                            date: f.date, source: "gedcom", confidence: "stated" }))
+      .filter(f => f.person_id != null);
+    for (const batch of chunks(factRows, 200)) { chk(await sb.from("facts").insert(batch)); step(batch.length); }
+    log(`${factRows.length} facts recorded`);
+
+    const edgeRows = plan.edges.map(e => ({ a_id: idOf(e.a), b_id: idOf(e.b), kind: e.kind,
+                                            since: e.since ?? null, note: e.note ?? null, source: "gedcom" }))
+      .filter(e => e.a_id != null && e.b_id != null && e.a_id !== e.b_id);
+    for (const batch of chunks(edgeRows, 200)) {
+      chk(await sb.from("edges").insert(batch));
+      step(batch.length);
+    }
+    log(`${edgeRows.length} family links recorded`);
+    log("\nDone.");
+    $("gedProg").style.width = "100%";
+    go.hidden = true; back.disabled = false; back.textContent = "Import another file";
+    toast(`${GED.file} imported`);
+    await reload();
+  } catch (e) {
+    log(`\nStopped: ${e.message}`);
+    toast(e.message, "err");
+    back.disabled = false;
+    await reload();
+  }
+}
+
+function wireGedModal() {
+  $("gedBtn").onclick = openGedModal;
+  $("gedClose").onclick = closeGedModal;
+  $("gedScrim").addEventListener("click", () => { if (gedOpen) closeGedModal(); });
+  $("gedBack").onclick = () => { $("gedBack").textContent = "Back"; gedShowPicker(); };
+  $("gedGo").onclick = gedApply;
+  $("gedFile").onchange = () => {
+    const file = $("gedFile").files[0];
+    $("gedFile").value = "";
+    if (file) gedRead(file);
+  };
+}
+
 // ── wiring ─────────────────────────────────────────────
 function wire() {
   wireCanvas();
   wireMdModal();
   wireFamModal();
+  wireGedModal();
 
   $("searchTrigger").onclick = () => openPalette();
   $("scrim").onclick = closePalette;
@@ -2385,6 +3040,7 @@ function wire() {
       else if (e.key === "Enter") { e.preventDefault(); pick(); }
       return;
     }
+    if (gedOpen) { if (e.key === "Escape") { e.preventDefault(); closeGedModal(); } return; }
     if (famModalOpen) { if (e.key === "Escape") { e.preventDefault(); closeFamModal(); } return; }
     if (typing) return;
 

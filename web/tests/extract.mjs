@@ -33,6 +33,24 @@ function sliceStatement(source, declaration) {
   return source.slice(start, end === -1 ? undefined : end);
 }
 
+/**
+ * `sliceStatement` stops at the first newline, which is wrong for a declaration whose value spans
+ * lines (an object literal, a chained call). This walks to the semicolon that closes it at nesting
+ * depth zero instead, so the constant can be reformatted in the page without breaking the tests.
+ */
+function sliceDeclaration(source, declaration) {
+  const start = source.indexOf(declaration);
+  if (start === -1) throw new Error(`web/index.html no longer declares: ${declaration}`);
+  let depth = 0;
+  for (let i = start; i < source.length; i++) {
+    const c = source[i];
+    if (c === "{" || c === "(" || c === "[") depth++;
+    else if (c === "}" || c === ")" || c === "]") depth--;
+    else if (c === ";" && depth === 0) return source.slice(start, i + 1);
+  }
+  throw new Error(`no statement end found for: ${declaration}`);
+}
+
 const html = readFileSync(INDEX_HTML, "utf8");
 
 const source = [
@@ -72,3 +90,24 @@ const familySource = [
 ].join("\n");
 
 export const { buildFamilyTree, famNodeHtml, edgeKindLabel, setData, setById } = new Function(familySource)();
+
+// The GEDCOM importer decides who is the same person as whom, so a regression here writes a
+// duplicate into the live graph. Same rule as above: run the shipped source, never a copy of it.
+const gedSource = [
+  sliceDeclaration(html, "const GED_MONTH = "),
+  sliceDeclaration(html, "const gnorm = "),
+  sliceDeclaration(html, "const GED_UNKNOWN_SURNAME = "),
+  sliceDeclaration(html, "const GED_REASON_BASE = "),
+  sliceFunction(html, "function gedFixCase("),
+  sliceFunction(html, "function gedDate("),
+  sliceFunction(html, "function gedParse("),
+  sliceFunction(html, "function gedDice("),
+  sliceFunction(html, "function gedBirthAgrees("),
+  sliceFunction(html, "function gedFileDuplicates("),
+  sliceFunction(html, "function gedMatch("),
+  sliceFunction(html, "function gedBuildWrites("),
+  `return { gedFixCase, gedDate, gedParse, gedBirthAgrees, gedFileDuplicates, gedMatch, gedBuildWrites };`,
+].join("\n");
+
+export const { gedFixCase, gedDate, gedParse, gedBirthAgrees, gedFileDuplicates, gedMatch, gedBuildWrites } =
+  new Function(gedSource)();
