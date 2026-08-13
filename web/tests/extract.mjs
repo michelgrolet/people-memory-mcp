@@ -44,3 +44,31 @@ const source = [
 ].join("\n");
 
 export const { esc, mdInline, mdRenderInline, mdRender } = new Function(source)();
+
+// `DATA`/`byId` are exposed as setters (not plain exports) because the extracted functions close
+// over the `let` declarations below — reassigning them from outside the Function body wouldn't be
+// seen by that closure, only calling back in through `setData`/`setById` is.
+const familySource = [
+  sliceStatement(html, "const esc = "),
+  sliceStatement(html, "const initials = "),
+  sliceStatement(html, "const TIE_COLOR = "),
+  sliceStatement(html, "const AGENT_COLOR = "),
+  sliceStatement(html, "const tieColor = "),
+  "let DATA = { edges: [] };",
+  "let byId = new Map();",
+  sliceFunction(html, "function parentsOf("),
+  sliceFunction(html, "function childrenOf("),
+  sliceFunction(html, "function famRel("),
+  sliceFunction(html, "function siblingsOf("),
+  sliceFunction(html, "function partnersOf("),
+  sliceFunction(html, "function uniqById("),
+  sliceFunction(html, "function buildFamilyTree("),
+  sliceFunction(html, "function famNodeHtml("),
+  sliceStatement(html, "const edgeKindLabel = "),
+  `return {
+    esc, buildFamilyTree, famNodeHtml, edgeKindLabel,
+    setData: d => { DATA = d; }, setById: m => { byId = m; },
+  };`,
+].join("\n");
+
+export const { buildFamilyTree, famNodeHtml, edgeKindLabel, setData, setById } = new Function(familySource)();

@@ -474,7 +474,43 @@
     /* placed after the .md-field rules above so it wins the cascade at equal specificity */
     .md-field .md-expand{width:30px;height:30px}
     .md-field-inline .md-expand{width:26px;height:26px;top:2px;right:2px}
+    #famModal{top:0;left:0;transform:none;width:100%;height:100%;max-height:none;border-radius:0}
+    #famModal.open{transform:none}
   }
+  /* ── family tree modal ───────────────────────────────── */
+  #famScrim{
+    position:fixed;inset:0;z-index:90;background:rgba(6,7,9,.68);
+    backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity 180ms var(--ease);
+  }
+  #famScrim.open{opacity:1;pointer-events:auto}
+  #famModal{
+    position:fixed;z-index:91;top:6vh;left:50%;width:min(720px,calc(100% - 28px));max-height:min(82vh,760px);
+    transform:translate(-50%,-10px) scale(.985);opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line2);border-radius:var(--r-lg);
+    box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;
+    transition:opacity 180ms var(--ease),transform 220ms var(--ease);
+  }
+  #famModal.open{opacity:1;transform:translate(-50%,0) scale(1);pointer-events:auto}
+  .fam-body{flex:1;overflow-y:auto;padding:20px 22px 26px}
+  .fam-gen{display:flex;flex-direction:column;align-items:center;gap:10px;margin:0 auto 22px;max-width:640px}
+  .fam-gen:last-child{margin-bottom:0}
+  .fam-gen-label{font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .fam-row{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+  .fam-node{
+    display:flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:999px;
+    background:var(--surface2);border:1px solid var(--line);cursor:pointer;transition:background 120ms var(--ease),border-color 120ms var(--ease);
+  }
+  .fam-node:hover{background:var(--surface3);border-color:var(--line2)}
+  .fam-node.self{background:var(--accent);border-color:var(--accent);cursor:default}
+  .fam-node.self .fam-node-name{color:var(--bg)}
+  .fam-node-avatar{
+    width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font:600 10px var(--mono);flex:0 0 auto;background:var(--surface3);
+  }
+  .fam-node-name{font-size:12.5px;white-space:nowrap}
+  .fam-connector{width:1px;height:14px;background:var(--line2)}
+  .fam-empty{text-align:center;color:var(--muted);font-size:13px;padding:30px 0}
+
   /* ── sync status popover ─────────────────────────────── */
   .sync-row{display:flex;align-items:center;gap:9px;padding:8px 2px}
   .sync-row+.sync-row{border-top:1px solid var(--line)}
@@ -650,6 +686,16 @@
   </div>
 </div>
 
+<div id="famScrim"></div>
+<div id="famModal" role="dialog" aria-modal="true" aria-labelledby="famModalTitle">
+  <div class="md-modal-head">
+    <h4 id="famModalTitle">Family tree</h4>
+    <button class="btn btn-ghost btn-icon" id="famModalClose" title="Close (esc)">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="fam-body" id="famBody"></div>
+</div>
+
 <div id="tooltip"></div>
 <div id="toasts"></div>
 <datalist id="orgs-dl"></datalist>
@@ -671,7 +717,12 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const $ = id => document.getElementById(id);
-const EDGE_KINDS = ["friend","family","partner","colleague","classmate","knows","sibling","neighbour","mentor_of","manager_of","introduced"];
+const EDGE_KINDS = ["friend","family","partner","colleague","classmate","knows","sibling","neighbour","parent","mentor_of","manager_of","introduced"];
+// "parent" is directed (a_id = parent, b_id = child) and is never canonicalized, unlike the
+// symmetric kinds above. The add-link dropdown offers it as two human-facing options —
+// this person "is parent of" / "is child of" the one you type — both writing the same kind
+// with a_id/b_id swapped; see addE below.
+const EDGE_ADD_KINDS = EDGE_KINDS.flatMap(k => k === "parent" ? ["parent", "child"] : [k]);
 const CHANNELS = ["irl","call","whatsapp","email","linkedin","sms","visio"];
 const TIE_LABEL = {1:"acquaintance",2:"friend",3:"close"};
 const TIE_COLOR = ["#4A4F5C","#8F8360","#C79C4E","#EDB13C"];
@@ -682,8 +733,9 @@ const AGENT_COLOR = "#C084FC";
 const EDGE_KIND_COLOR = {
   friend: "#5B9BF2", family: "#F2739A", partner: "#D66BE0", colleague: "#8C7CF0",
   classmate: "#F2C94C", knows: "#9AA7BD", sibling: "#F2916B", neighbour: "#6FCF7A",
-  mentor_of: "#A67C52", manager_of: "#C0524A", introduced: "#B8C24F",
+  parent: "#E0B84E", mentor_of: "#A67C52", manager_of: "#C0524A", introduced: "#B8C24F",
 };
+const FAM_ICON = '<svg class="icon" viewBox="0 0 24 24"><circle cx="7" cy="6" r="3"/><circle cx="17" cy="6" r="3"/><path d="M7 9v3M17 9v3M4 21v-3a3 3 0 0 1 3-3h0a3 3 0 0 1 3 3v3M14 21v-3a3 3 0 0 1 3-3h0a3 3 0 0 1 3 3v3"/></svg>';
 const COPY_ICON = '<svg class="icon" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
 const SYNC_LABELS = {
   sync_backup: "Backup",
@@ -698,6 +750,8 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 const norm = s => String(s ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const tieColor = t => TIE_COLOR[t || 0];
 const tieLabel = t => t ? TIE_LABEL[t] : "not rated";
+// "parent" is the only directed edge kind: label it from the current person's side.
+const edgeKindLabel = (c, personId) => c.kind === "parent" ? (c.a === personId ? "parent of" : "child of") : c.kind;
 const initials = n => n.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
 function ago(days) {
   if (days == null) return "";
@@ -795,6 +849,79 @@ function wireMdModal() {
   $("mdModalCancel").onclick = closeMdModal;
   $("mdModalSave").onclick = saveMdModal;
   $("mdScrim").addEventListener("click", () => { if ($("mdModal").classList.contains("open")) closeMdModal(); });
+}
+
+// ── family tree modal (built from directed "parent" edges + symmetric sibling/partner) ──
+function parentsOf(id) { return DATA.edges.filter(e => e.kind === "parent" && e.b === id).map(e => byId.get(e.a)).filter(Boolean); }
+function childrenOf(id) { return DATA.edges.filter(e => e.kind === "parent" && e.a === id).map(e => byId.get(e.b)).filter(Boolean); }
+function famRel(id, kind) {
+  return DATA.edges.filter(e => e.kind === kind && (e.a === id || e.b === id))
+    .map(e => byId.get(e.a === id ? e.b : e.a)).filter(Boolean);
+}
+function siblingsOf(id) { return famRel(id, "sibling"); }
+function partnersOf(id) { return famRel(id, "partner"); }
+function uniqById(list) {
+  const seen = new Set(), out = [];
+  for (const p of list) if (p && !seen.has(p.id)) { seen.add(p.id); out.push(p); }
+  return out;
+}
+
+function buildFamilyTree(id) {
+  const person = byId.get(id);
+  if (!person) return null;
+  const parents = parentsOf(id);
+  const parentIds = new Set(parents.map(p => p.id));
+  // a parent's partner is very often the other parent, just not linked directly yet
+  const otherParents = parents.flatMap(p => partnersOf(p.id)).filter(p => p.id !== id && !parentIds.has(p.id));
+  const parentsRow = uniqById([...parents, ...otherParents]);
+  const grandparents = uniqById(parentsRow.flatMap(p => parentsOf(p.id)));
+  const children = childrenOf(id);
+  const grandchildren = uniqById(children.flatMap(c => childrenOf(c.id)));
+  return { person, grandparents, parents: parentsRow, siblings: siblingsOf(id), partners: partnersOf(id), children, grandchildren };
+}
+
+function famNodeHtml(p, isSelf) {
+  const color = p.kind === "agent" ? AGENT_COLOR : tieColor(p.tie);
+  return `<div class="fam-node${isSelf ? " self" : ""}"${isSelf ? "" : ` data-fam-goto="${p.id}"`}>
+    <span class="fam-node-avatar"${isSelf ? "" : ` style="color:${color};border:1px solid ${color}44"`}>${esc(initials(p.name))}</span>
+    <span class="fam-node-name">${esc(p.name)}</span>
+  </div>`;
+}
+
+function renderFamilyTree(id) {
+  const fam = buildFamilyTree(id);
+  const body = $("famBody");
+  if (!fam) { body.innerHTML = `<div class="fam-empty">Person not found.</div>`; return; }
+  $("famModalTitle").textContent = `${fam.person.name} — family tree`;
+  const rows = [
+    ["Grandparents", fam.grandparents.map(p => famNodeHtml(p))],
+    ["Parents", fam.parents.map(p => famNodeHtml(p))],
+    ["Family", [...fam.siblings.map(p => famNodeHtml(p)), famNodeHtml(fam.person, true), ...fam.partners.map(p => famNodeHtml(p))]],
+    ["Children", fam.children.map(p => famNodeHtml(p))],
+    ["Grandchildren", fam.grandchildren.map(p => famNodeHtml(p))],
+  ].filter(([, html]) => html.length);
+  body.innerHTML = rows.length > 1
+    ? rows.map(([label, html], i) =>
+        (i > 0 ? `<div class="fam-connector"></div>` : "") +
+        `<div class="fam-gen"><div class="fam-gen-label">${esc(label)}</div><div class="fam-row">${html.join("")}</div></div>`
+      ).join("")
+    : `<div class="fam-empty">No family links recorded for ${esc(fam.person.name)} yet.<br>Add a parent, child, sibling, or partner link from their record.</div>`;
+  body.querySelectorAll("[data-fam-goto]").forEach(el => el.onclick = () => { closeFamModal(); select(Number(el.dataset.famGoto)); });
+}
+
+let famModalOpen = false;
+function openFamModal(id) {
+  renderFamilyTree(id);
+  $("famScrim").classList.add("open"); $("famModal").classList.add("open");
+  famModalOpen = true;
+}
+function closeFamModal() {
+  $("famScrim").classList.remove("open"); $("famModal").classList.remove("open");
+  famModalOpen = false;
+}
+function wireFamModal() {
+  $("famModalClose").onclick = closeFamModal;
+  $("famScrim").addEventListener("click", () => { if (famModalOpen) closeFamModal(); });
 }
 // Wires the small "expand" button next to a field to open the big editor.
 function wireMdExpand(id, title, onSaved) {
@@ -1681,6 +1808,7 @@ function renderDrawer(p) {
         <h2 id="drName">${esc(p.name)}</h2>
         <div class="sub" id="drSub">${headChips(p)}</div>
       </div>
+      ${p.kind === "agent" ? "" : `<button class="btn btn-ghost btn-icon" id="famBtn" title="Family tree">${FAM_ICON}</button>`}
       <button class="btn btn-ghost btn-icon" id="closeDr" title="Close (esc)">
         <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
     </div>
@@ -1721,12 +1849,12 @@ function renderDrawer(p) {
 
       <section class="blk"><h3>Direct links <em>${conn.length}</em></h3>
         ${conn.length ? conn.map(c => `<div class="row-item">
-            <a class="lbl" data-goto="${c.id}"><span class="k">${esc(c.kind)}</span> ${esc(c.label)}</a>
+            <a class="lbl" data-goto="${c.id}"><span class="k">${esc(edgeKindLabel(c, p.id))}</span> ${esc(c.label)}</a>
             <span class="x" data-de="${c.a}|${c.b}|${esc(c.kind)}">✕</span></div>`).join("")
           : `<div class="none">no links recorded</div>`}
         <div class="add">
           <input id="et" list="people-dl" placeholder="person">
-          <select id="ek" style="max-width:110px">${EDGE_KINDS.map(k => `<option>${k}</option>`).join("")}</select>
+          <select id="ek" style="max-width:110px">${EDGE_ADD_KINDS.map(k => `<option>${k}</option>`).join("")}</select>
           <button class="btn btn-sm" id="addE">+</button>
         </div>
       </section>
@@ -1803,6 +1931,7 @@ function renderDrawer(p) {
   const chk = r => { if (r.error) throw new Error(r.error.message); return r; };
 
   $("closeDr").onclick = closeDrawer;
+  if ($("famBtn")) $("famBtn").onclick = () => openFamModal(p.id);
   wireInlineFields(p);
   wireMdViewField("f_sum", "Summary", "Click to write a summary…");
   wireMdExpand("fv", "Fact value");
@@ -1868,7 +1997,11 @@ function renderDrawer(p) {
     const name = $("et").value.trim();
     const t = DATA.people.find(q => q.name === name && q.id !== p.id);
     if (!t) throw new Error("Person not found. Choose an exact name from the list.");
-    chk(await sb.from("edges").upsert({ a_id: p.id, b_id: t.id, kind: $("ek").value, source: "dashboard" }));
+    const sel = $("ek").value;
+    // "child" is a UI-only alias: it writes kind="parent" with a_id/b_id swapped, so the
+    // typed person ends up as the parent regardless of which end you're editing from.
+    const [a_id, b_id, kind] = sel === "child" ? [t.id, p.id, "parent"] : [p.id, t.id, sel];
+    chk(await sb.from("edges").upsert({ a_id, b_id, kind, source: "dashboard" }));
   }, "link added");
   $("addA").onclick = () => run(async () => {
     const name = $("ao").value.trim(); if (!name) throw new Error("Organization name is empty.");
@@ -2168,6 +2301,7 @@ function renderActiveFilters() {
 function wire() {
   wireCanvas();
   wireMdModal();
+  wireFamModal();
 
   $("searchTrigger").onclick = () => openPalette();
   $("scrim").onclick = closePalette;
@@ -2251,6 +2385,7 @@ function wire() {
       else if (e.key === "Enter") { e.preventDefault(); pick(); }
       return;
     }
+    if (famModalOpen) { if (e.key === "Escape") { e.preventDefault(); closeFamModal(); } return; }
     if (typing) return;
 
     if (e.key === "Escape") { pop.classList.remove("open"); statusPop.classList.remove("open"); insightsPop.classList.remove("open"); if (egoSet) { egoSet = null; renderActiveFilters(); invalidate(); } else closeDrawer(); }
