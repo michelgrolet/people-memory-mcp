@@ -1382,20 +1382,51 @@ function famLayout(edges) {
       reindex();
     }
 
-    // 6. columns. Each row is centred inside the component, so parents sit roughly over children.
-    const widths = rows.map(row => row
-      ? row.reduce((w, g) => w + members.get(groups[g]).length, 0) + (row.length - 1) * TREE_GAP : 0);
-    const w = Math.max(...widths, 1);
+    // 6. columns. A row is packed tight, in the order the sweeps settled — holes between people
+    //    would buy nothing here and cost width, and width is what decides whether the whole tree
+    //    still fits on one screen. What moves is the row as a whole: it slides until it sits
+    //    under the generation above it, which is what shortens the long horizontal runs. Centring
+    //    every row on the component instead leaves a couple stranded far from their own children.
+    const size = g => members.get(groups[g]).length;
+    const lx = new Map(), rowOf = new Map(), off = rows.map(() => 0), rowW = rows.map(() => 0);
+    rows.forEach((row, r) => {
+      if (!row) return;
+      let cur = 0;
+      for (const g of row) { lx.set(g, cur); rowOf.set(g, r); cur += size(g) + TREE_GAP; }
+      rowW[r] = Math.max(cur - TREE_GAP, 0);
+    });
+    const mid = g => off[rowOf.get(g)] + lx.get(g) + size(g) / 2;
+    for (let s = 0; s < 8; s++) {
+      const downward = s % 2 === 0;
+      for (let i = 0; i < rows.length; i++) {
+        const r = downward ? i : rows.length - 1 - i;
+        const row = rows[r];
+        if (!row) continue;
+        let sum = 0, n = 0;
+        for (const g of row) {
+          const rel = downward ? up[g] : down[g];
+          if (!rel.length) continue;
+          sum += rel.reduce((a, o) => a + mid(o), 0) / rel.length - (lx.get(g) + size(g) / 2);
+          n++;
+        }
+        if (n) off[r] = sum / n;
+      }
+    }
+
+    let left = Infinity, right = -Infinity;
+    rows.forEach((row, r) => {
+      if (!row) return;
+      left = Math.min(left, off[r]); right = Math.max(right, off[r] + rowW[r]);
+    });
     const cells = [];
     rows.forEach((row, r) => {
       if (!row) return;
-      let cur = (w - widths[r]) / 2;
       for (const g of row) {
-        for (const id of members.get(groups[g])) { cells.push({ id, col: cur, row: r }); cur += 1; }
-        cur += TREE_GAP;
+        let col = off[r] + lx.get(g) - left;
+        for (const id of members.get(groups[g])) { cells.push({ id, col, row: r }); col += 1; }
       }
     });
-    laid.push({ cells, w, h: rows.length });
+    laid.push({ cells, w: Math.max(right - left, 1), h: rows.length });
   }
 
   // 7. trees packed left to right, wrapping onto a new shelf rather than running off into one
@@ -1459,7 +1490,10 @@ function buildGraph() {
     const lay = famLayout(DATA.edges);
     for (const id of lay.keys()) addP(id);
     pinned.forEach(id => addP(id));
+    // family links only: a colleague edge between two cousins is true, and in this view it is a
+    // long diagonal across four generations that hides the tree it crosses
     DATA.edges.forEach(e => {
+      if (!TREE_KINDS.has(e.kind) && e.kind !== "family") return;
       const x = idx.get("p" + e.a), y = idx.get("p" + e.b);
       if (x !== undefined && y !== undefined) links.push({ s: x, t: y, kind: e.kind, ea: e.a, eb: e.b });
     });
