@@ -617,6 +617,81 @@
     #skModal.open{transform:none}
   }
 
+  /* ── cleanup overlay ─────────────────────────────────── */
+  #cleanScrim{
+    position:fixed;inset:0;z-index:96;background:rgba(6,7,9,.68);
+    backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity 180ms var(--ease);
+  }
+  #cleanScrim.open{opacity:1;pointer-events:auto}
+  #cleanModal{
+    position:fixed;z-index:97;top:5vh;left:50%;width:min(880px,calc(100% - 28px));max-height:min(86vh,860px);
+    transform:translate(-50%,-10px) scale(.985);opacity:0;pointer-events:none;
+    background:var(--surface);border:1px solid var(--line2);border-radius:var(--r-lg);
+    box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;
+    transition:opacity 180ms var(--ease),transform 220ms var(--ease);
+  }
+  #cleanModal.open{opacity:1;transform:translate(-50%,0) scale(1);pointer-events:auto}
+  #cleanModal .md-modal-head h4{flex:0 0 auto}
+  .cl-count{font:500 11.5px/1 var(--mono);color:var(--muted);flex:1}
+  .cl-body{flex:1;overflow-y:auto;padding:14px 18px 22px}
+  .cl-sec+.cl-sec{margin-top:22px}
+  .cl-sec-h{display:flex;align-items:center;gap:8px;margin:0 0 3px}
+  .cl-sec-h h5{font:600 12px/1.3 var(--font);color:var(--txt)}
+  .cl-sec-h .n{font:500 10.5px/1 var(--mono);color:var(--accent);background:var(--accent-dim);padding:3px 6px;border-radius:999px}
+  .cl-why{font-size:11.5px;line-height:1.5;color:var(--muted);margin:0 0 9px;max-width:64ch}
+  .cl-item{
+    border:1px solid var(--line);border-radius:var(--r-md);background:var(--bg2);
+    padding:9px 10px;display:flex;align-items:flex-start;gap:10px;
+  }
+  .cl-item+.cl-item{margin-top:7px}
+  .cl-main{flex:1;min-width:0}
+  .cl-cands{display:flex;flex-wrap:wrap;gap:7px}
+  .cl-cand{
+    display:flex;flex-direction:column;gap:2px;text-align:left;padding:6px 10px;min-width:0;
+    background:var(--surface2);border:1px solid var(--line);border-radius:var(--r-sm);
+    cursor:pointer;transition:background 120ms var(--ease),border-color 120ms var(--ease);
+  }
+  .cl-cand:hover{background:var(--surface3);border-color:var(--line2)}
+  .cl-cand b{
+    font:600 12.5px/1.35 var(--font);color:var(--txt);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:36ch;
+  }
+  .cl-cand .cl-meta{
+    font:400 10.5px/1.4 var(--font);color:var(--muted);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:36ch;
+  }
+  .cl-cand .cl-meta em{font-style:normal;font-family:var(--mono);font-size:9.5px;opacity:.85}
+  .cl-line{font-size:12.5px;line-height:1.5;color:var(--txt2)}
+  .cl-line b{color:var(--txt);font-weight:600}
+  .cl-skip{
+    flex:0 0 auto;border:none;background:none;color:var(--muted);cursor:pointer;
+    font:500 11px/1 var(--font);padding:5px 7px;border-radius:var(--r-sm);white-space:nowrap;
+    transition:color 120ms,background 120ms;
+  }
+  .cl-skip:hover{color:var(--txt2);background:var(--surface2)}
+  .cl-empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:52px 0 48px;text-align:center}
+  .cl-empty .big{font:600 15px/1.3 var(--display);color:var(--txt)}
+  .cl-empty .sub{font-size:12.5px;color:var(--muted);max-width:42ch}
+  .cl-foot{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;
+    border-top:1px solid var(--line);flex:0 0 auto;background:var(--bg2);
+  }
+  .cl-foot .hint{color:var(--muted);font-size:11.5px}
+  /* the top-bar button carries the open count, so a fresh problem is visible without opening it */
+  #cleanBtn{position:relative}
+  #cleanBtn .dot{
+    position:absolute;top:0;right:0;min-width:16px;height:16px;padding:0 3px;border-radius:999px;
+    background:var(--accent);color:var(--bg);font:600 9.5px/16px var(--mono);text-align:center;
+    border:2px solid var(--bg2);display:none;
+  }
+  #cleanBtn.has .dot{display:block}
+  @media (max-width:640px){
+    #cleanModal{top:0;left:0;transform:none;width:100%;height:100%;max-height:none;border-radius:0}
+    #cleanModal.open{transform:none}
+    .cl-cand{width:100%}
+    .cl-cand b,.cl-cand .cl-meta{max-width:none;white-space:normal}
+  }
+
   /* ── sync status popover ─────────────────────────────── */
   .sync-row{display:flex;align-items:center;gap:9px;padding:8px 2px}
   .sync-row+.sync-row{border-top:1px solid var(--line)}
@@ -684,6 +759,10 @@
     </button>
     <button class="btn btn-ghost btn-icon" id="gedBtn" title="Import a family tree (GEDCOM)">
       <svg class="icon" viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+    </button>
+    <button class="btn btn-ghost btn-icon" id="cleanBtn" title="Cleanup — duplicates and broken links">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.2-2.9 7.9-7 9.5-4.1-1.6-7-5.3-7-9.5V6l7-3z"/><path d="m9 12 2 2 4-4"/></svg>
+      <span class="dot" id="cleanDot"></span>
     </button>
     <button class="btn btn-ghost btn-icon" id="insightsBtn" title="Insights">
       <svg class="icon" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
@@ -834,6 +913,21 @@
       <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
   </div>
   <div class="sk-body" id="skBody"></div>
+</div>
+
+<div id="cleanScrim"></div>
+<div id="cleanModal" role="dialog" aria-modal="true" aria-labelledby="cleanModalTitle">
+  <div class="md-modal-head">
+    <h4 id="cleanModalTitle">Cleanup</h4>
+    <span class="cl-count" id="cleanCount"></span>
+    <button class="btn btn-ghost btn-icon" id="cleanClose" title="Close (esc)">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="cl-body" id="cleanBody"></div>
+  <div class="cl-foot">
+    <span class="hint" id="cleanSkipped"></span>
+    <button class="btn" id="cleanUnskip" hidden>Bring back what I skipped</button>
+  </div>
 </div>
 
 <div id="tooltip"></div>
@@ -1186,10 +1280,11 @@ async function start(session) {
     $("boot").innerHTML = `<div class="pulse" style="color:var(--red)">${esc(e.message)}</div>`;
     return;
   }
+  await cleanLoadSkipped();
   buildGraph();
   setupCanvas();
   wire();
-  renderStats(); renderFilters(); renderActiveFilters();
+  renderStats(); renderFilters(); renderActiveFilters(); cleanBadge();
   prewarm();
   requestAnimationFrame(tick);
   fitView(false);
@@ -1218,7 +1313,7 @@ async function load() {
   const [people, orgs, edges, affs, idents, facts, inter, comp] = await Promise.all([
     fetchAll(() => sb.from("person").select("*").order("full_name")),
     fetchAll(() => sb.from("orgs").select("id,name,kind,domain,city,country,note,parent_org_id").order("name")),
-    fetchAll(() => sb.from("edges").select("a_id,b_id,kind,strength").order("a_id")),
+    fetchAll(() => sb.from("edges").select("a_id,b_id,kind,strength,note").order("a_id")),
     fetchAll(() => sb.from("affiliations").select("person_id,org_id,role,since,until").order("person_id")),
     fetchAll(() => sb.from("identifiers").select("person_id,kind,value").order("person_id")),
     fetchAll(() => sb.from("facts").select("id,person_id,key,value,num,date").order("id")),
@@ -1256,7 +1351,7 @@ async function load() {
     _nname: norm(p.full_name),
   }));
   DATA.orgs = orgs.data;
-  DATA.edges = edges.data.map(e => ({ a: e.a_id, b: e.b_id, kind: e.kind, strength: e.strength }));
+  DATA.edges = edges.data.map(e => ({ a: e.a_id, b: e.b_id, kind: e.kind, strength: e.strength, note: e.note }));
   DATA.affs = affs.data;
   byId = new Map(DATA.people.map(p => [p.id, p]));
   DATA.stats = {
@@ -1268,7 +1363,7 @@ async function load() {
 
 async function reload(keepId) {
   await load();
-  buildGraph(); renderStats(); renderFilters(); renderActiveFilters();
+  buildGraph(); renderStats(); renderFilters(); renderActiveFilters(); cleanBadge();
   reheat(.28);
   if (keepId != null && byId.has(keepId)) select(keepId, false); else closeDrawer();
 }
@@ -1395,6 +1490,413 @@ function renderInsights() {
     <div class="grp"><h4>Super connectors</h4>${rowsC}</div>
   `;
   $("insightsList").querySelectorAll("[data-goto]").forEach(a => a.onclick = () => goto(Number(a.dataset.goto)));
+}
+
+// ── cleanup: what the imports got wrong ───────────────────
+// The graph grows faster than anyone reads it — a LinkedIn export, a WhatsApp sync, a GEDCOM file
+// each write hundreds of records nobody opens again. This screen reads them for you and lists what
+// looks broken. It never repairs anything on its own: AGENTS.md forbids merging ambiguous
+// identities automatically, and it is right to, because two records that look identical here are
+// routinely two real people — a son named after his father, three sisters given the same name.
+//
+// The one signal that reliably separates the two cases is a link. If somebody has already drawn an
+// edge between the two records, somebody has already decided they are different people, so every
+// duplicate check below drops a pair that is linked. That is what keeps the three Marie Rouyers,
+// all siblings of each other, out of this list for good.
+
+const CLEAN_SKIP_KEY = "cleanup_skipped";
+const CLEAN_MIN_PARENT_GAP = 12; // years; below this a "parent" edge is a mistake, not a young mother
+
+// Fold a name to what it would be if two people typed it on two different days: no case, no
+// accents, no punctuation. "Emmanuel d’Hardemare" against "Emmanuel d'Hardemare" — one curly
+// quote — is the duplicate an import leaves behind and a human never spots scrolling a list.
+const cleanFold = s => norm(s).replace(/[^a-z0-9]+/g, "");
+const cleanTokens = s => norm(s).split(/[^a-z0-9]+/).filter(Boolean);
+// Legal suffixes are noise on an organization: "NinjaTech AI" and "Ninjatech-ai" are one company,
+// and so are "Acme" and "Acme Inc". Stripping every token would leave nothing, so a name made only
+// of suffixes keeps them.
+const CLEAN_ORG_SUFFIX = /^(inc|llc|ltd|limited|corp|corporation|co|sa|sas|sarl|sasu|gmbh|bv|nv|plc|ag|spa|srl|group|groupe|holding|holdings)$/;
+function cleanOrgFold(name) {
+  const all = cleanTokens(name);
+  const kept = all.filter(w => !CLEAN_ORG_SUFFIX.test(w));
+  return (kept.length ? kept : all).join("");
+}
+// A domain is the same company whether it was typed with a protocol, a www, or a trailing slash.
+function cleanDomainFold(d) {
+  return String(d ?? "").trim().toLowerCase()
+    .replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
+}
+// The identifier shown on a candidate card has to fit on one line next to the counts, and a
+// LinkedIn URL does not — its first forty characters are the same for everybody, so a truncated one
+// reads as "linked…" and says nothing. Keep the part that differs.
+function cleanIdentLabel(i) {
+  const v = String(i.value ?? "").trim();
+  if (i.kind === "linkedin") return "linkedin " + v.replace(/^https?:\/\/(www\.)?linkedin\.com\/(in|company)\//, "").replace(/\/$/, "");
+  return `${i.kind} ${v}`;
+}
+// One name's words are all inside the other's, so the difference is only what one record spells out
+// — "Anne Brugière" inside "Anne Marie Brugière". Two records that each carry a word the other
+// lacks ("Jean-Marie Gabriel" against "Jean-Marie François") are two people, and stay out.
+function cleanTokensSubset(a, b) {
+  const rest = b.slice();
+  for (const t of a) {
+    const i = rest.indexOf(t);
+    if (i === -1) return false;
+    rest.splice(i, 1);
+  }
+  return true;
+}
+
+// Pure on purpose: everything it needs arrives in `data`, so the whole of what this screen claims
+// can be run against fixtures in web/tests instead of against the live graph.
+function cleanScan(data, skipped) {
+  const people = data.people || [], orgs = data.orgs || [], edges = data.edges || [], affs = data.affs || [];
+  const skip = skipped || new Set();
+  const pById = new Map(people.map(p => [p.id, p]));
+  const pairKey = (a, b) => (a < b ? `${a}+${b}` : `${b}+${a}`);
+
+  const links = new Map(), linked = new Set();
+  for (const e of edges) {
+    links.set(e.a, (links.get(e.a) || 0) + 1);
+    links.set(e.b, (links.get(e.b) || 0) + 1);
+    if (e.a !== e.b) linked.add(pairKey(e.a, e.b));
+  }
+  const orgMembers = new Map();
+  for (const a of affs) orgMembers.set(a.org_id, (orgMembers.get(a.org_id) || 0) + 1);
+
+  const year = d => (d ? parseInt(String(d).slice(0, 4), 10) : NaN);
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  const personRef = id => {
+    const p = pById.get(id);
+    if (!p) return { type: "person", id, name: `#${id}`, meta: "", meta2: "" };
+    const bits = [];
+    if (p.birthdate) bits.push(p.birthdate);
+    if (p.org) bits.push(p.org); else if (p.role) bits.push(p.role);
+    if (p.city) bits.push(p.city);
+    // The id is always shown: two records can carry the same name, the same empty org and the same
+    // empty city, and a card that reads exactly like the one beside it cannot be acted on.
+    const counts = [`#${id}`];
+    counts.push(plural(links.get(id) || 0, "link"));
+    if (p.facts && p.facts.length) counts.push(plural(p.facts.length, "fact"));
+    if (p.interactions && p.interactions.length) counts.push(plural(p.interactions.length, "interaction"));
+    const ident = (p.identifiers || [])[0];
+    return {
+      type: "person", id, name: p.name,
+      meta: bits.join(" · "),
+      meta2: [counts.join(" · "), ident ? cleanIdentLabel(ident) : ""].filter(Boolean).join("  ·  "),
+    };
+  };
+  const orgRef = id => {
+    const o = orgs.find(x => x.id === id);
+    if (!o) return { type: "org", id, name: `#${id}`, meta: "", meta2: "" };
+    return {
+      type: "org", id, name: o.name,
+      meta: [o.kind, o.domain, o.city].filter(Boolean).join(" · "),
+      meta2: `#${id}  ·  ${plural(orgMembers.get(id) || 0, "member")}`,
+    };
+  };
+
+  const sections = [];
+  const section = (id, title, why, items) => { if (items.length) sections.push({ id, title, why, items }); };
+  const keep = item => !skip.has(item.key) && item;
+  const live = list => list.filter(i => i && !skip.has(i.key));
+
+  // 1 — the same email or phone on two records is not a judgement call, it is one person filed twice.
+  const byIdent = new Map();
+  for (const p of people)
+    for (const i of p.identifiers || []) {
+      const v = String(i.value ?? "").trim().toLowerCase();
+      if (!v) continue;
+      const k = `${i.kind}|${v}`;
+      if (!byIdent.has(k)) byIdent.set(k, { kind: i.kind, value: i.value, ids: new Set() });
+      byIdent.get(k).ids.add(p.id);
+    }
+  section("dup-ident", "One contact detail, two records",
+    "The same address or number is written on both. Open each one, keep the fuller record, move anything the other holds onto it.",
+    live([...byIdent.entries()].filter(([, g]) => g.ids.size > 1).map(([k, g]) => ({
+      key: `ident:${k}`,
+      headline: `${plural(g.ids.size, "record")} share the ${g.kind} <b>${esc(g.value)}</b>`,
+      refs: [...g.ids].map(personRef),
+    }))));
+
+  // 2 — the same name, spelled the same once the accents and punctuation are folded away.
+  const byName = new Map();
+  for (const p of people) {
+    const k = cleanFold(p.name);
+    if (!k) continue;
+    if (!byName.has(k)) byName.set(k, []);
+    byName.get(k).push(p.id);
+  }
+  const namePairs = [], nearPairs = [];
+  for (const ids of byName.values()) {
+    if (ids.length < 2) continue;
+    for (let i = 0; i < ids.length; i++)
+      for (let j = i + 1; j < ids.length; j++)
+        if (!linked.has(pairKey(ids[i], ids[j])))
+          namePairs.push({ key: `name:${pairKey(ids[i], ids[j])}`, refs: [personRef(ids[i]), personRef(ids[j])] });
+  }
+  section("dup-name", "The same name, twice",
+    "Spelled identically once case, accents and punctuation are set aside. Pairs already linked to each other are left out — a link means somebody has decided they are two people.",
+    live(namePairs));
+
+  // 3 — same first and last word, and one record simply spells out more of the name than the other.
+  const byEnds = new Map();
+  for (const p of people) {
+    const t = cleanTokens(p.name);
+    if (t.length < 2) continue;
+    const k = `${t[0]}|${t[t.length - 1]}`;
+    if (!byEnds.has(k)) byEnds.set(k, []);
+    byEnds.get(k).push({ id: p.id, t, fold: cleanFold(p.name) });
+  }
+  for (const list of byEnds.values()) {
+    if (list.length < 2) continue;
+    for (let i = 0; i < list.length; i++)
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i], b = list[j];
+        if (a.fold === b.fold) continue; // already reported above as an exact match
+        if (linked.has(pairKey(a.id, b.id))) continue;
+        if (!cleanTokensSubset(a.t, b.t) && !cleanTokensSubset(b.t, a.t)) continue;
+        nearPairs.push({ key: `near:${pairKey(a.id, b.id)}`, refs: [personRef(a.id), personRef(b.id)] });
+      }
+  }
+  section("dup-near", "Almost the same name",
+    "Same first and last word, and one record writes out a middle name the other leaves off. Often one person, sometimes a father and a son — read both before touching either.",
+    live(nearPairs));
+
+  // 4 — organizations, by folded name and by domain. A declared parent/child pair is deliberate.
+  const orgPairs = new Map();
+  const orgGroup = (map, reason) => {
+    for (const [, list] of map) {
+      if (list.length < 2) continue;
+      for (let i = 0; i < list.length; i++)
+        for (let j = i + 1; j < list.length; j++) {
+          const a = orgs.find(o => o.id === list[i]), b = orgs.find(o => o.id === list[j]);
+          if (a.parent_org_id === b.id || b.parent_org_id === a.id) continue;
+          const k = pairKey(list[i], list[j]);
+          if (!orgPairs.has(k)) orgPairs.set(k, { key: `org:${k}`, reasons: [], refs: [orgRef(list[i]), orgRef(list[j])] });
+          orgPairs.get(k).reasons.push(reason);
+        }
+    }
+  };
+  const byOrgName = new Map(), byOrgDomain = new Map();
+  for (const o of orgs) {
+    const n = cleanOrgFold(o.name);
+    if (n) { if (!byOrgName.has(n)) byOrgName.set(n, []); byOrgName.get(n).push(o.id); }
+    const d = cleanDomainFold(o.domain);
+    if (d) { if (!byOrgDomain.has(d)) byOrgDomain.set(d, []); byOrgDomain.get(d).push(o.id); }
+  }
+  orgGroup(byOrgName, "same name");
+  orgGroup(byOrgDomain, "same domain");
+  section("dup-org", "The same organization, twice",
+    "Matched on the name once “Inc”, “SAS” and the like are dropped, or on the domain. A declared parent and its subsidiary are left out.",
+    live([...orgPairs.values()].map(i => ({ ...i, headline: `Matched on ${[...new Set(i.reasons)].join(" and ")}` }))));
+
+  // 5 — an organization nobody belongs to holds a name that will be typed again and re-created.
+  section("org-empty", "Organizations with nobody in them",
+    "No member and no subsidiary. Usually a name typed twice, or the losing half of a merge already done by hand.",
+    live(orgs.filter(o => !orgMembers.get(o.id) && !orgs.some(x => x.parent_org_id === o.id))
+      .map(o => ({ key: `orgempty:${o.id}`, headline: "Nobody is affiliated to it", refs: [orgRef(o.id)] }))));
+
+  // 6 — links that cannot all be true at once.
+  const broken = [];
+  const seenEdge = new Map(), pairKinds = new Map(), parentsOfId = new Map();
+  for (const e of edges) {
+    if (e.a === e.b) {
+      broken.push({ key: `self:${e.a}:${e.kind}`, headline: `Linked to themselves as <b>${esc(e.kind)}</b>`, refs: [personRef(e.a)] });
+      continue;
+    }
+    const pk = pairKey(e.a, e.b);
+    const dk = `${pk}|${e.kind}`;
+    seenEdge.set(dk, (seenEdge.get(dk) || 0) + 1);
+    if (!pairKinds.has(pk)) pairKinds.set(pk, new Set());
+    pairKinds.get(pk).add(e.kind);
+    if (e.kind === "parent") {
+      if (!parentsOfId.has(e.b)) parentsOfId.set(e.b, []);
+      parentsOfId.get(e.b).push(e.a);
+    }
+  }
+  for (const [dk, n] of seenEdge) {
+    if (n < 2) continue;
+    const [pk, kind] = dk.split("|");
+    const [a, b] = pk.split("+").map(Number);
+    broken.push({ key: `dupedge:${dk}`, headline: `Linked as <b>${esc(kind)}</b> ${n} times over`, refs: [personRef(a), personRef(b)] });
+  }
+  for (const [pk, kinds] of pairKinds) {
+    if (!kinds.has("parent")) continue;
+    const clash = [...kinds].filter(k => k === "sibling" || k === "partner");
+    if (!clash.length) continue;
+    const [a, b] = pk.split("+").map(Number);
+    broken.push({ key: `clash:${pk}`, headline: `Linked as <b>parent</b> and as <b>${esc(clash.join(", "))}</b>`, refs: [personRef(a), personRef(b)] });
+  }
+  for (const [child, parents] of parentsOfId) {
+    if (parents.length > 2)
+      broken.push({
+        key: `parents:${child}`, headline: `${plural(parents.length, "parent")} — one of them belongs to a duplicate record`,
+        refs: [personRef(child), ...parents.map(personRef)],
+      });
+    for (const par of parents) {
+      const pc = year(pById.get(child) && pById.get(child).birthdate);
+      const pp = year(pById.get(par) && pById.get(par).birthdate);
+      if (!isNaN(pc) && !isNaN(pp) && pc - pp < CLEAN_MIN_PARENT_GAP)
+        broken.push({
+          key: `gap:${par}+${child}`,
+          headline: pc < pp ? "Born before their own parent" : `Only ${pc - pp} years apart`,
+          refs: [personRef(par), personRef(child)],
+        });
+    }
+  }
+  // Somebody who is their own ancestor: a parent edge pointing the wrong way, always.
+  const colour = new Map();
+  const kids = new Map();
+  for (const [child, parents] of parentsOfId) for (const p of parents) {
+    if (!kids.has(p)) kids.set(p, []);
+    kids.get(p).push(child);
+  }
+  for (const start of kids.keys()) {
+    if (colour.get(start)) continue;
+    const stack = [[start, 0]];
+    const path = [];
+    while (stack.length) {
+      const frame = stack[stack.length - 1];
+      const [node, i] = frame;
+      if (i === 0) {
+        if (colour.get(node) === 2) { stack.pop(); continue; }
+        colour.set(node, 1); path.push(node);
+      }
+      const next = (kids.get(node) || [])[i];
+      if (next === undefined) { colour.set(node, 2); path.pop(); stack.pop(); continue; }
+      frame[1]++;
+      if (colour.get(next) === 1) {
+        // `next` opens the loop and is already the first element of the slice — the ring is the
+        // slice itself, and its key must not depend on which node the walk happened to start from.
+        const ring = path.slice(path.indexOf(next));
+        broken.push({
+          key: `cycle:${[...ring].sort((x, y) => x - y).join("+")}`,
+          headline: "Their own ancestor — a parent link points the wrong way",
+          refs: ring.map(personRef),
+        });
+      }
+      else if (colour.get(next) !== 2) stack.push([next, 0]);
+    }
+  }
+  section("link-broken", "Links that contradict each other",
+    "Each of these is impossible as written, so one of the two links — or one of the two records — is wrong.",
+    live(broken));
+
+  // 7 — a family link that was never given a generation. The tree view cannot draw it.
+  section("link-vague", "Family links nobody has classified",
+    "Filed as “family”, which the family tree cannot place on a row. Say parent, child or sibling and they appear in the tree.",
+    live(edges.filter(e => e.kind === "family" && e.a !== e.b).map(e => ({
+      key: `vague:${pairKey(e.a, e.b)}`,
+      headline: e.note ? `Noted: <b>${esc(e.note)}</b>` : "No note says which way it runs",
+      refs: [personRef(e.a), personRef(e.b)],
+    }))));
+
+  const total = sections.reduce((n, s) => n + s.items.length, 0);
+  return { sections, total, skipped: skip.size };
+}
+
+// ── cleanup: the overlay ──────────────────────────────────
+let cleanSkipped = new Set();
+let cleanOpen = false;
+
+// A skip is a decision about the graph, not about this browser: it survives a reload and reaches
+// the phone. app_settings already holds the owner's own settings under the same owner-only policy,
+// so this adds a key, never a new surface.
+async function cleanLoadSkipped() {
+  const { data, error } = await sb.from("app_settings").select("value").eq("key", CLEAN_SKIP_KEY).maybeSingle();
+  if (error || !data) return;
+  try {
+    const arr = JSON.parse(data.value);
+    if (Array.isArray(arr)) cleanSkipped = new Set(arr.map(String));
+  } catch { /* a value this app did not write is not worth crashing the boot over */ }
+}
+async function cleanSaveSkipped() {
+  const { error } = await sb.from("app_settings")
+    .upsert({ key: CLEAN_SKIP_KEY, value: JSON.stringify([...cleanSkipped]), updated_at: new Date().toISOString() });
+  if (error) toast(error.message, "err");
+}
+
+function cleanBadge() {
+  const btn = $("cleanBtn");
+  if (!btn) return;
+  const { total } = cleanScan(DATA, cleanSkipped);
+  btn.classList.toggle("has", total > 0);
+  $("cleanDot").textContent = total > 99 ? "99+" : String(total);
+  btn.title = total ? `Cleanup — ${total} to look at` : "Cleanup — nothing to fix";
+}
+
+function cleanRefHtml(r) {
+  const attr = r.type === "org" ? "data-clean-org" : "data-clean-person";
+  return `<button class="cl-cand" ${attr}="${r.id}" title="Open this record">
+    <b>${esc(r.name)}</b>
+    ${r.meta ? `<span class="cl-meta">${esc(r.meta)}</span>` : ""}
+    ${r.meta2 ? `<span class="cl-meta"><em>${esc(r.meta2)}</em></span>` : ""}
+  </button>`;
+}
+
+// Pure, so the markup this screen really ships can be rendered outside the browser — by a test, or
+// by a preview page — instead of being reimplemented somewhere that quietly drifts from it.
+function cleanBodyHtml(scan) {
+  if (!scan.total) return `
+    <div class="cl-empty">
+      <div class="big">Nothing to fix</div>
+      <div class="sub">No duplicate record, no organization left empty, no link that contradicts another.</div>
+    </div>`;
+  return scan.sections.map(s => `
+    <section class="cl-sec">
+      <div class="cl-sec-h"><h5>${esc(s.title)}</h5><span class="n">${s.items.length}</span></div>
+      <p class="cl-why">${esc(s.why)}</p>
+      ${s.items.map(i => `
+        <div class="cl-item">
+          <div class="cl-main">
+            ${i.headline ? `<div class="cl-line">${i.headline}</div>` : ""}
+            <div class="cl-cands" style="margin-top:${i.headline ? "6px" : "0"}">${i.refs.map(cleanRefHtml).join("")}</div>
+          </div>
+          <button class="cl-skip" data-clean-skip="${esc(i.key)}" title="Hide this for good">Not a problem</button>
+        </div>`).join("")}
+    </section>`).join("");
+}
+
+function renderClean() {
+  const scan = cleanScan(DATA, cleanSkipped);
+  $("cleanCount").textContent = scan.total ? `${scan.total} to look at` : "";
+  $("cleanBody").innerHTML = cleanBodyHtml(scan);
+
+  const n = cleanSkipped.size;
+  $("cleanSkipped").textContent = n ? `${n} marked “not a problem”` : "";
+  $("cleanUnskip").hidden = !n;
+
+  $("cleanBody").querySelectorAll("[data-clean-person]").forEach(el =>
+    el.onclick = () => { closeCleanModal(); select(Number(el.dataset.cleanPerson)); });
+  $("cleanBody").querySelectorAll("[data-clean-org]").forEach(el =>
+    el.onclick = () => { closeCleanModal(); selectOrg(Number(el.dataset.cleanOrg)); });
+  $("cleanBody").querySelectorAll("[data-clean-skip]").forEach(el =>
+    el.onclick = async () => {
+      cleanSkipped.add(el.dataset.cleanSkip);
+      renderClean(); cleanBadge();
+      await cleanSaveSkipped();
+    });
+}
+
+function openCleanModal() {
+  $("cleanScrim").classList.add("open"); $("cleanModal").classList.add("open");
+  cleanOpen = true;
+  renderClean();
+}
+function closeCleanModal() {
+  $("cleanScrim").classList.remove("open"); $("cleanModal").classList.remove("open");
+  cleanOpen = false;
+}
+function wireCleanModal() {
+  $("cleanBtn").onclick = () => { closePalette(); openCleanModal(); };
+  $("cleanClose").onclick = closeCleanModal;
+  $("cleanScrim").addEventListener("click", () => { if (cleanOpen) closeCleanModal(); });
+  $("cleanUnskip").onclick = async () => {
+    cleanSkipped = new Set();
+    renderClean(); cleanBadge();
+    await cleanSaveSkipped();
+  };
 }
 
 // ── family tree layout ────────────────────────────────────
@@ -3657,6 +4159,7 @@ function wire() {
   wireFamModal();
   wireGedModal();
   wireSkModal();
+  wireCleanModal();
 
   $("searchTrigger").onclick = () => openPalette();
   $("scrim").onclick = closePalette;
@@ -3749,6 +4252,7 @@ function wire() {
       else if (e.key === "Enter") { e.preventDefault(); pick(); }
       return;
     }
+    if (cleanOpen) { if (e.key === "Escape") { e.preventDefault(); closeCleanModal(); } return; }
     if (gedOpen) { if (e.key === "Escape") { e.preventDefault(); closeGedModal(); } return; }
     if (famModalOpen) { if (e.key === "Escape") { e.preventDefault(); closeFamModal(); } return; }
     if (typing) return;

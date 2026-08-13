@@ -129,6 +129,28 @@ const pickOrgSource = [
 
 export const { orgTag, pickOrg, setOrgs } = new Function(pickOrgSource)();
 
+// The cleanup screen accuses records of being duplicates. A false positive there is a merge that
+// should never have happened, so the scan runs here against fixtures instead of the live graph.
+const cleanSource = [
+  sliceStatement(html, "const esc = "),
+  sliceStatement(html, "const norm = "),
+  sliceStatement(html, "const CLEAN_MIN_PARENT_GAP = "),
+  sliceStatement(html, "const cleanFold = "),
+  sliceStatement(html, "const cleanTokens = "),
+  sliceStatement(html, "const CLEAN_ORG_SUFFIX = "),
+  sliceFunction(html, "function cleanOrgFold("),
+  sliceFunction(html, "function cleanDomainFold("),
+  sliceFunction(html, "function cleanIdentLabel("),
+  sliceFunction(html, "function cleanTokensSubset("),
+  sliceFunction(html, "function cleanScan("),
+  sliceFunction(html, "function cleanRefHtml("),
+  sliceFunction(html, "function cleanBodyHtml("),
+  "return { cleanFold, cleanOrgFold, cleanDomainFold, cleanTokensSubset, cleanScan, cleanBodyHtml };",
+].join("\n");
+
+export const { cleanFold, cleanOrgFold, cleanDomainFold, cleanTokensSubset, cleanScan, cleanBodyHtml } =
+  new Function(cleanSource)();
+
 // The GEDCOM importer decides who is the same person as whom, so a regression here writes a
 // duplicate into the live graph. Same rule as above: run the shipped source, never a copy of it.
 const gedSource = [

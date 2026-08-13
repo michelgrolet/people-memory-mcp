@@ -19,6 +19,7 @@ contact data, or credentials.
 - Runs fully local with Supabase CLI or in the cloud with any PostgreSQL database.
 - Recommends a free Supabase project because it includes Postgres, Auth, REST, and a local stack.
 - Includes a full-screen relationship graph and searchable directory.
+- Flags what an import got wrong — duplicate people and organizations, contradictory links.
 - Refuses uncertain merges and conflicting overwrites until the user decides.
 
 ## How it fits together
@@ -222,6 +223,21 @@ Supported patterns include:
 - Browser agents: Codex in Chrome or Claude in Chrome can help configure Supabase and inspect the UI.
 
 See [docs/connectors.md](docs/connectors.md) for the permission and identity rules.
+
+### Cleanup
+
+Every import writes records nobody reads again, and they collide. The shield button in the top bar
+opens a screen that reads them for you: two records sharing an email or a phone, the same name
+spelled two ways, an organization entered twice under a legal suffix, an organization nobody
+belongs to, links that cannot all be true (someone their own ancestor, a parent younger than their
+child, a pair filed as both parent and sibling), and family links still too vague for the tree.
+The count on the button is what is waiting.
+
+It never merges anything. Duplicate-looking records are routinely two real people — a son named
+after his father, three sisters given the same name — so each finding opens the records side by
+side with what separates them, and the decision stays yours. A pair already linked to each other
+is left out entirely: the link is somebody having decided they differ. **Not a problem** hides a
+finding for good, stored with the owner's own settings so the list drains instead of nagging.
 
 ### Shared days, if you also keep a location archive
 
