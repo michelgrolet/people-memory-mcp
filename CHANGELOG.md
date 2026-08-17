@@ -56,6 +56,15 @@ All notable changes to People Memory are documented here.
   name.
 - The LinkedIn connection date is stored in the date column, not only as text.
 - CI had never actually run, and applied only one migration when it did.
+- **Identifiers are case-insensitive everywhere, not only on lookup.** Reading matched
+  `lower(value)` while writing lowercased email alone, and the primary key is `(kind, value)`. So
+  `linkedin.com/in/x` and `LinkedIn.com/in/X` were two rows `on conflict` could not see as one, and
+  a person owning both came back as two candidates that nothing in the product could collapse again.
+  Storage now agrees with lookup, the database carries the rule as a check constraint, and
+  `20260817010000_identifiers_are_case_insensitive.sql` folds existing rows down. It stops rather
+  than guess if a value differing only by case belongs to two different people; merge them first.
+- The same profile URL in another case is no longer reported as a conflict by `remember_person`,
+  which used to make it unanswerable for any importer that does not control casing.
 
 ### Security
 

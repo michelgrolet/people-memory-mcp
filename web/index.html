@@ -3651,7 +3651,9 @@ function renderDrawer(p) {
     }));
   }, "interaction recorded");
   $("addI").onclick = () => run(async () => {
-    const value = $("iv").value.trim(); if (!value) throw new Error("Value is empty.");
+    // Lowercase to match the check constraint on identifiers.value: the primary key is
+    // (kind, value), and lookup compares lowercase, so a capital here is a row nobody finds.
+    const value = $("iv").value.trim().toLowerCase(); if (!value) throw new Error("Value is empty.");
     chk(await sb.from("identifiers").upsert({ person_id: p.id, kind: $("ik").value, value }));
   }, "identifier added");
   if ($("addC")) $("addC").onclick = () => run(async () => {

@@ -38,6 +38,31 @@ def _normalize_name(value: str) -> str:
     return " ".join(re.findall(r"[a-z0-9]+", without_marks))
 
 
+def _conflicts_with(key: str, existing: Any, incoming: Any) -> bool:
+    """Whether a stored value and an incoming one genuinely disagree.
+
+    `linkedin_url` is an identifier wearing a column, and a URL's case carries no meaning. Comparing
+    it verbatim made the same profile, retyped or re-exported in another case, come back as
+    needs_confirmation, which is a dead end for any importer that does not control casing.
+    """
+    if existing in (None, "", incoming):
+        return False
+    if key == "linkedin_url":
+        return str(existing).strip().lower() != str(incoming).strip().lower()
+    return True
+
+
+def _normalize_identifier(value: str) -> str:
+    """Identifiers are matched case-insensitively, so they are stored that way.
+
+    Lookup has always compared `lower(i.value)`, while writing lowercased `email` alone. The gap
+    let two rows differ by case, which the `(kind, value)` primary key could not see as one, and a
+    person matching both was returned as two candidates and could never be resolved again. The
+    database now carries the same rule as a check constraint.
+    """
+    return value.strip().lower()
+
+
 def _name_similarity(left: str, right: str) -> float:
     left_normalized = _normalize_name(left)
     right_normalized = _normalize_name(right)
@@ -118,14 +143,18 @@ class GraphRepository:
     ) -> list[dict[str, Any]]:
         if email or phone or linkedin_url:
             identifiers = [("email", email), ("phone", phone), ("linkedin", linkedin_url)]
-            identifiers = [(kind, value.strip().lower()) for kind, value in identifiers if value]
+            identifiers = [
+                (kind, _normalize_identifier(value)) for kind, value in identifiers if value
+            ]
             for kind, value in identifiers:
                 rows = list(
                     conn.execute(
                         """
                         select p.id, p.full_name, p.current_org, p.city
                         from people p join identifiers i on i.person_id = p.id
-                        where i.kind = %s and lower(i.value) = %s
+                        -- Plain equality, not lower(i.value): stored values are lowercase by
+                        -- check constraint, so this is the same match and it uses the primary key.
+                        where i.kind = %s and i.value = %s
                         """,
                         (kind, value),
                     ).fetchall()
@@ -295,7 +324,7 @@ class GraphRepository:
                 conflicts = {
                     key: {"existing": existing[key], "incoming": value}
                     for key, value in fields.items()
-                    if value is not None and existing.get(key) not in (None, "", value)
+                    if value is not None and _conflicts_with(key, existing.get(key), value)
                 }
                 if conflicts and not overwrite:
                     return {
@@ -348,7 +377,7 @@ class GraphRepository:
                 ("linkedin", linkedin_url),
             ):
                 if value:
-                    normalized = value.strip().lower() if kind == "email" else value.strip()
+                    normalized = _normalize_identifier(value)
                     conn.execute(
                         """
                         insert into identifiers (person_id, kind, value, source)
@@ -394,7 +423,7 @@ class GraphRepository:
     def add_identifier(
         self, person_id: int, kind: str, value: str, source: str = "agent"
     ) -> dict[str, Any]:
-        normalized = value.strip().lower() if kind == "email" else value.strip()
+        normalized = _normalize_identifier(value)
         if not normalized:
             raise ValueError("identifier value is required")
         with self.db.transaction() as conn:

@@ -202,3 +202,55 @@ def test_add_fact_same_value_different_date_is_not_deduped() -> None:
         f"select count(*) as n from facts where person_id = {person_id} and key = 'weight_kg'"
     )
     assert rows[0]["n"] == 2
+
+
+def test_identifier_case_does_not_create_a_second_unresolvable_person() -> None:
+    """The bug this guards: storage was case-sensitive while lookup was not.
+
+    Writing lowercased `email` and nothing else, so `linkedin.com/in/x` and `LinkedIn.com/in/X`
+    were two rows the `(kind, value)` primary key could not see as one. That is worse than a
+    duplicate: the next lookup lowercases, matches both, and the person becomes two candidates
+    that no tool in the product can collapse again.
+    """
+    repo = _repo()
+    with repo.db.connection() as conn:
+        conn.execute(
+            "truncate deleted_records, interactions, facts, edges, affiliations, identifiers, "
+            "orgs, people restart identity cascade"
+        )
+
+    created = repo.remember_person(
+        full_name="Wren Halloway",
+        email="Wren.Halloway@Example.com",
+        linkedin_url="https://www.LinkedIn.com/in/Wren-Halloway",
+        confirmed_new=True,
+        source="test",
+    )
+    assert created["status"] == "created"
+
+    with repo.db.connection() as conn:
+        stored = [
+            row["value"]
+            for row in conn.execute("select value from identifiers order by value").fetchall()
+        ]
+    assert stored == [value.lower() for value in stored], stored
+
+    # Same person, typed in every other casing: still one person, never a second row.
+    for email, linkedin in (
+        ("wren.halloway@example.com", "https://www.linkedin.com/in/wren-halloway"),
+        ("WREN.HALLOWAY@EXAMPLE.COM", "https://www.LINKEDIN.com/in/WREN-HALLOWAY"),
+    ):
+        again = repo.remember_person(
+            full_name="Wren Halloway", email=email, linkedin_url=linkedin, source="test"
+        )
+        assert again["status"] == "updated", again
+        assert again["person"]["id"] == created["person"]["id"]
+
+    added = repo.add_identifier(created["person"]["id"], "github", "WrenH", "test")
+    assert added["status"] == "created"
+    repeat = repo.add_identifier(created["person"]["id"], "github", "wrenh", "test")
+    assert repeat["status"] != "created", repeat
+
+    with repo.db.connection() as conn:
+        assert conn.execute("select count(*) as n from people").fetchone()["n"] == 1
+        assert conn.execute("select count(*) as n from identifiers").fetchone()["n"] == 3
