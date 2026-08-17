@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import re
 import unicodedata
 from datetime import date
@@ -612,9 +611,3 @@ class GraphRepository:
             cursor = conn.execute(guarded)
             rows = list(cursor.fetchall()) if cursor.description else []
             return {"row_count": cursor.rowcount, "rows": rows[:500]}
-
-    def archive_payload(self, person_id: int) -> str:
-        person = self.get_person(person_id)
-        if person is None:
-            raise ValueError("Person not found")
-        return json.dumps(person, default=str, ensure_ascii=False)

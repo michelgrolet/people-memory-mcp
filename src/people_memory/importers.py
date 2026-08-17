@@ -6,7 +6,6 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
@@ -258,12 +257,3 @@ def parse_whatsapp_export(
         names.setdefault(name, ContactRecord(full_name=name, source="whatsapp"))
         interactions.setdefault(name, []).append(parsed)
     return list(names.values()), interactions
-
-
-def contacts_from_rows(rows: Iterable[dict[str, str]], name_column: str) -> list[ContactRecord]:
-    result = []
-    for row in rows:
-        name = (row.get(name_column) or "").strip()
-        if name:
-            result.append(ContactRecord(full_name=name, source="csv"))
-    return result

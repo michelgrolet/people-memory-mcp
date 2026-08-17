@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import lru_cache
 from secrets import compare_digest
 from typing import Any
 
@@ -110,8 +109,3 @@ def create_app():
         return {"deleted": True}
 
     return app
-
-
-@lru_cache(maxsize=1)
-def app():
-    return create_app()

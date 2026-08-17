@@ -50,7 +50,7 @@ jobs:
           done
       - run: uv run ruff check .
       - run: uv run pytest --cov=people_memory --cov-report=term-missing
-      # The dashboard ships as one dependency-free index.html, so its markdown renderer is tested
+      # The dashboard ships as one index.html with no build step, so its markdown renderer is tested
       # with node's own runner against the real source pulled out of that file. Uses the Node
       # already on the runner; the shell expands the glob, so no test-runner glob support needed.
       - name: Test the dashboard markdown renderer

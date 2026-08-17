@@ -5,8 +5,11 @@ stable
 security definer
 set search_path = public
 as $$
-  select coalesce(auth.jwt() ->> 'email', '') =
-         coalesce((select value from app_settings where key = 'owner_email'), '');
+  -- Fails closed on purpose. Coalescing both sides to '' made this true when both were absent
+  -- (no owner row, and a token with no email claim, which is what signInAnonymously issues).
+  select nullif(auth.jwt() ->> 'email', '') is not null
+     and nullif(auth.jwt() ->> 'email', '')
+         = nullif((select value from app_settings where key = 'owner_email'), '');
 $$;
 
 revoke all on function is_people_memory_owner() from public;

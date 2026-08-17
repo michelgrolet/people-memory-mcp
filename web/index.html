@@ -2419,9 +2419,9 @@ const TREE_BUS = 34;    // how far above a child row the horizontal "bus" of a p
  * One bloodline, never the whole graph. From a root person: every ancestor, every descendant, the
  * root's own brothers and sisters, and the husband or wife of each of those — drawn as a leaf, with
  * their own parents and siblings left out. That last rule is the whole point. With everyone on one
- * page, Solange's brothers and sisters sat on the same rows as Michel's and the picture claimed a
- * kinship that does not exist (his words, 2026-08-13: "imo we can't just show everyone on the same
- * page"). Clicking that spouse re-roots the tree on their family instead.
+ * page, a spouse's brothers and sisters sat on the same rows as the root's own, and the picture
+ * claimed a kinship that does not exist. Clicking that spouse re-roots the tree on their family
+ * instead.
  *
  * Pure: returns `{ ids, core }`, ids being everyone to place and core everyone who is there by
  * blood. An edge is worth drawing only if it touches core — two people who both married in are not
@@ -2468,10 +2468,10 @@ function famLayout(edges) {
   if (!ids.length) return out;
 
   // 1. a group is a sibling set, and only a sibling set. Merging partners in as well is
-  //    transitive, so a spouse's whole family got spliced into yours: Solange's brothers and
-  //    sisters landed in the same unbroken run as Michel's own, which reads as one big family
-  //    (his words, 2026-08-13: "it looks like we're all related"). A couple is two groups side by
-  //    side instead, kept on the same row by the constraint in step 3.
+  //    transitive, so a spouse's whole family got spliced into yours: their brothers and sisters
+  //    landed in the same unbroken run as the root's own, and the row reads as one big family
+  //    where there are two. A couple is two groups side by side instead, kept on the same row by
+  //    the constraint in step 3.
   const par = new Map(ids.map(id => [id, id]));
   const find = x => { while (par.get(x) !== x) { par.set(x, par.get(par.get(x))); x = par.get(x); } return x; };
   for (const e of fam) if (e.kind === "sibling") { const a = find(e.a), b = find(e.b); if (a !== b) par.set(a, b); }
@@ -2570,8 +2570,8 @@ function famLayout(edges) {
     const size = g => members.get(groups[g]).length;
     // Someone who married in and has nobody else on this tree is not a family of their own: they
     // belong beside the person they married, inside that family's block. Left loose in the row
-    // they get pushed out by whoever else married into the same sibling set — on the live graph
-    // that put Solange five people away from Michel with his brother-in-law in between.
+    // they get pushed out by whoever else married into the same sibling set, which parked one
+    // spouse five people away from their own husband or wife with an in-law in between.
     const isLeafSpouse = g => size(g) === 1 && !up[g].length && !down[g].length && mate[g].length === 1;
     const attached = new Map(), hosted = new Set();
     for (const row of rows) {
@@ -2619,8 +2619,8 @@ function famLayout(edges) {
       left = Math.min(left, off[r]); right = Math.max(right, off[r] + rowW[r]);
     });
     // Inside a sibling set the order was whatever the edge list happened to hold, which parks the
-    // married brother in the middle of his siblings and his wife at the far end of the row, four
-    // people away from him. Whoever has a spouse in the group to the left goes to the left edge,
+    // married sibling in the middle of the set and their spouse at the far end of the row, four
+    // people away. Whoever has a spouse in the group to the left goes to the left edge,
     // to the right goes to the right edge, and everyone else keeps their order.
     const facing = (id, g) => g !== undefined && (pmate.get(id) || []).some(o => gi.get(find(o)) === g);
     const cells = [];
@@ -2649,7 +2649,7 @@ function famLayout(edges) {
   }
 
   // 7. trees packed left to right, wrapping onto a new shelf rather than running off into one
-  //    strip a mile wide — biggest family first, so his own tree opens the view.
+  //    strip a mile wide — biggest family first, so the largest tree opens the view.
   laid.sort((a, b) => b.cells.length - a.cells.length || b.w - a.w);
   const area = laid.reduce((s, c) => s + c.w * c.h * (TREE_ROW / TREE_COL), 0);
   const shelfW = Math.max(...laid.map(c => c.w), Math.sqrt(area) * 1.5);
@@ -4346,7 +4346,7 @@ function gedBuildWrites(rows, families, people, existingEdges = []) {
 
   const SYMMETRIC = new Set(["partner", "sibling"]);
   // A link that is already recorded is left exactly as it is. Rewriting it would replace a note
-  // Michel wrote by hand ("frère de Michel, confirmé le…") with this importer's empty one.
+  // somebody wrote by hand ("brother, confirmed on…") with this importer's empty one.
   const already = new Set();
   for (const e of existingEdges) {
     already.add(`${e.a}|${e.b}|${e.kind}`);
