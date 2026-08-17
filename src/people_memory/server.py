@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import argparse
+import sys
 from datetime import date
 from functools import lru_cache
 from typing import Any
@@ -214,8 +216,40 @@ def write_query(query: str) -> dict[str, Any]:
     return _repo().write_query(query)
 
 
-def main() -> None:
+def serve() -> None:
+    """Check the configuration, then serve MCP over stdio until the client disconnects.
+
+    The check is the point. Settings are otherwise read on the first tool call, so a bad or
+    missing connection string produced a server that started, connected, and then failed every
+    single tool from inside the agent, where the reason is hard to see. Failing here puts the
+    reason in the client's server log instead.
+    """
+    try:
+        _settings()
+    except RuntimeError as exc:
+        raise SystemExit(f"people-memory-mcp: {exc}") from exc
+
+    if sys.stdin.isatty():
+        print(
+            "people-memory-mcp speaks MCP over stdin and stdout, so there is nothing to see "
+            "when it is run by hand. An MCP client starts it for you. Configuration is fine; "
+            "run `people-memory status` to check the database.",
+            file=sys.stderr,
+        )
+
     mcp.run(transport="stdio")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        prog="people-memory-mcp",
+        description="Run the People Memory MCP server over stdio.",
+        epilog="Point an MCP client at this command. `people-memory setup` writes that "
+        "configuration for you, and `people-memory --help` covers everything else.",
+    )
+    parser.add_argument("--version", action="version", version=__version__)
+    parser.parse_args()
+    serve()
 
 
 if __name__ == "__main__":

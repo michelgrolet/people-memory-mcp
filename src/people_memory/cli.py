@@ -252,9 +252,9 @@ def cmd_status(_: argparse.Namespace) -> None:
 
 
 def cmd_mcp(_: argparse.Namespace) -> None:
-    from .server import main as server_main
+    from .server import serve
 
-    server_main()
+    serve()
 
 
 def cmd_api(args: argparse.Namespace) -> None:
