@@ -75,6 +75,11 @@ All notable changes to People Memory are documented here.
   earlier one.
 - The login page no longer offers an email and password form when the API refuses that method, via a
   `passwordLogin` config flag.
+- **The Supabase client is pinned to an exact version.** The dashboard imported
+  `@supabase/supabase-js@2`, which floats: the CDN serves whatever the newest 2.x is at the moment
+  the page opens, and that module runs inside the authenticated session. A publish upstream changed
+  what ran here with nobody deciding anything. A test now fails on any remote import that is not
+  pinned, and on any remote `<script src>` that would skip the check.
 - `search_path` pinned on every function.
 - Test fixtures are invented people throughout, and `.claude/` is ignored so a local agent config
   cannot be committed.

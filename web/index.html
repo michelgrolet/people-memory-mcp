@@ -1070,7 +1070,11 @@
 
 <script src="./config.js"></script>
 <script type="module">
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+// Pinned to an exact version on purpose. `@2` floats: esm.sh serves whatever the newest 2.x is at
+// the moment the page loads, and this module runs inside the authenticated session, so a bad
+// publish upstream would be reading the whole graph before anyone noticed a version had changed.
+// Bump it deliberately, and read the changelog when you do.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.112.3";
 
 const CONFIG = window.PEOPLE_MEMORY_CONFIG || {};
 const SUPABASE_URL = CONFIG.supabaseUrl;
