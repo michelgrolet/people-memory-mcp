@@ -105,20 +105,20 @@ def test_resolve_person_single_fuzzy_match_needs_confirmation() -> None:
             "orgs, people restart identity cascade"
         )
     created = repo.remember_person(
-        full_name="Michel Grolet", confirmed_new=True, source="test"
+        full_name="Wren Halloway", confirmed_new=True, source="test"
     )
     assert created["status"] == "created"
 
     # Exact name still resolves straight away.
-    exact = repo.resolve_person("Michel Grolet")
+    exact = repo.resolve_person("Wren Halloway")
     assert exact["status"] == "resolved"
-    assert exact["person"]["full_name"] == "Michel Grolet"
+    assert exact["person"]["full_name"] == "Wren Halloway"
 
     # A partial/fuzzy query matching exactly one row must NOT silently resolve:
     # it should ask for confirmation, even though there is only one candidate.
-    fuzzy = repo.resolve_person("Michel")
+    fuzzy = repo.resolve_person("Wren")
     assert fuzzy["status"] == "needs_confirmation"
-    assert [c["full_name"] for c in fuzzy["candidates"]] == ["Michel Grolet"]
+    assert [c["full_name"] for c in fuzzy["candidates"]] == ["Wren Halloway"]
 
 
 def test_remember_person_resolves_similarity_from_extensions_schema() -> None:

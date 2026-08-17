@@ -42,24 +42,24 @@ test("partners and siblings share a row and stay next to each other", () => {
 });
 
 test("a spouse's own siblings never join yours in one run", () => {
-  // Michel + his siblings, married to Solange who has siblings of her own. Merging partners into
-  // the same group as siblings made the two families one unbroken row (2026-08-13).
+  // One person with siblings, married to someone who has siblings of their own. Merging partners
+  // into the same group as siblings made the two families one unbroken row.
   const pos = famLayout([
-    sibling(1, 2), sibling(1, 3),          // his side
+    sibling(1, 2), sibling(1, 3),          // one side
     partner(1, 10),                        // the marriage
-    sibling(10, 11), sibling(10, 12),      // her side
+    sibling(10, 11), sibling(10, 12),      // the other side
   ]);
-  const his = [1, 2, 3].map(i => pos.get(i).x), hers = [10, 11, 12].map(i => pos.get(i).x);
-  assert.equal(new Set([...his, ...hers].map(x => pos.get(1).y)).size, 1, "still one generation");
-  const gap = Math.min(...hers.map(h => Math.min(...his.map(x => Math.abs(h - x)))));
-  assert.ok(Math.max(...his) < Math.min(...hers) || Math.max(...hers) < Math.min(...his),
+  const ours = [1, 2, 3].map(i => pos.get(i).x), theirs = [10, 11, 12].map(i => pos.get(i).x);
+  assert.equal(new Set([...ours, ...theirs].map(x => pos.get(1).y)).size, 1, "still one generation");
+  const gap = Math.min(...theirs.map(t => Math.min(...ours.map(x => Math.abs(t - x)))));
+  assert.ok(Math.max(...ours) < Math.min(...theirs) || Math.max(...theirs) < Math.min(...ours),
     "the two families do not interleave");
   assert.ok(gap > 0, "and they are not the same block");
 });
 
 test("a spouse sits next to their own husband or wife, not at the end of the siblings", () => {
-  // 1 is married to 10 and has four siblings. The edge list happens to put him in the middle of
-  // them, which parked Solange four people away from Michel on the live graph (2026-08-13).
+  // 1 is married to 10 and has four siblings. The edge list happens to put 1 in the middle of
+  // them, which parked the spouse four people away instead of alongside.
   const pos = famLayout([
     sibling(2, 1), sibling(3, 1), sibling(1, 4), sibling(1, 5), partner(1, 10),
   ]);
@@ -125,7 +125,7 @@ test("the layout is centred on the origin, where the camera starts", () => {
 
 // ── bloodline: who is even on the page ─────────────────────────────────────────────────────────
 // Scoping is the correctness question here, not the drawing: showing one person too many puts two
-// unrelated families on the same rows, which is exactly the picture he rejected.
+// unrelated families on the same rows, which is the picture this view exists to avoid.
 
 test("a spouse is drawn, their parents and siblings are not", () => {
   //  1 = root, 10 = the spouse, 11/12 = the spouse's siblings, 13 = the spouse's father
@@ -177,7 +177,8 @@ test("a person recorded as their own ancestor does not hang the page", () => {
 });
 
 test("a big tree stays fast enough to build on every toggle", () => {
-  // his own imported tree is ~195 people over 10 generations; a binary pyramid of 500 is worse
+  // a real imported tree runs to a couple hundred people over ~10 generations; a binary pyramid
+  // of 500 is worse than any of them
   const edges = [];
   for (let i = 1; i <= 500; i++) { edges.push(parent(i, i * 2)); edges.push(parent(i, i * 2 + 1)); }
   const t0 = Date.now();

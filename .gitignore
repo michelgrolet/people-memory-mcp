@@ -16,3 +16,6 @@ supabase/.temp/
 .DS_Store
 
 .gstack/
+
+.claude/
+.codex/
