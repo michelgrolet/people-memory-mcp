@@ -24,6 +24,9 @@ def test_allows_single_reads(query: str) -> None:
         "select 1; select 2",
         "with gone as (delete from people returning *) select * from gone",
         "select pg_sleep(10)",
+        # Parses as a SELECT, and writes a table.
+        "select * into evil from people",
+        "select id into evil from people where id = 1",
     ],
 )
 def test_read_rejects_anything_that_is_not_one_plain_select(query: str) -> None:

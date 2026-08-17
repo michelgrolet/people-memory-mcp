@@ -136,6 +136,8 @@ def add_fact(
         source=_settings().default_source,
         confidence=confidence,
     )
+    if not fact:
+        return {"status": "unchanged", "reason": "this fact is already on the record"}
     return {"status": "created", "fact": fact}
 
 
@@ -169,12 +171,14 @@ def connect_people(
     note: str | None = None,
 ) -> dict[str, Any]:
     """Create a relationship between two existing people. Never guesses ambiguous names."""
+    # `unresolved` already carries its own status, needs_confirmation or not_found, and it is the
+    # accurate one. Only say which side failed.
     a_id, unresolved_a = _resolve(person_a)
     if unresolved_a:
-        return {"status": "needs_confirmation", "side": "person_a", **unresolved_a}
+        return {**unresolved_a, "side": "person_a"}
     b_id, unresolved_b = _resolve(person_b)
     if unresolved_b:
-        return {"status": "needs_confirmation", "side": "person_b", **unresolved_b}
+        return {**unresolved_b, "side": "person_b"}
     edge = _repo().connect_people(
         a_id,
         b_id,

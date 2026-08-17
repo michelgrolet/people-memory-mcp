@@ -104,7 +104,7 @@ class GraphRepository:
                 needle,
                 needle,
                 query.strip(),
-                min(limit, 100),
+                min(max(limit, 1), 100),
             ),
         )
 
@@ -538,7 +538,7 @@ class GraphRepository:
             order by tie_strength desc nulls last, days_since_contact desc
             limit %s
             """,
-            (min_days, min(limit, 200)),
+            (min_days, min(max(limit, 1), 200)),
         )
 
     def find_intro_path(

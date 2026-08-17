@@ -44,6 +44,13 @@ def guard_read(sql: str) -> str:
     dml = [token.normalized.upper() for token in statement.flatten() if token.ttype is DML]
     if any(keyword != "SELECT" for keyword in dml):
         raise ValueError("Data-changing statements are blocked inside read_query CTEs.")
+    # `select ... into t` writes a table and still parses as a SELECT, so the type check above lets
+    # it through. INTO cannot go in BLOCKED_KEYWORDS because every INSERT carries it too; it is only
+    # ever wrong on the read path. The read-only transaction in db.py stops this anyway, and that is
+    # the real boundary — this keeps the guard from being the weaker of the two.
+    keywords = {token.normalized.upper() for token in statement.flatten() if token.ttype in Keyword}
+    if "INTO" in keywords:
+        raise ValueError("SELECT ... INTO writes a table and is blocked in read_query.")
     if re.search(r"\b(pg_sleep|dblink|lo_import|lo_export)\s*\(", cleaned, re.IGNORECASE):
         raise ValueError("This database function is blocked in raw SQL tools.")
     return cleaned

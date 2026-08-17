@@ -160,9 +160,15 @@ distribution.
 | `read_query` | Run one guarded `SELECT` for advanced analysis |
 | `write_query` | Run one guarded `INSERT`, `UPDATE`, or `DELETE` |
 
-Raw SQL is disabled by default. If enabled, it rejects multiple statements, DDL, dangerous
-functions, multiple data-changing operations, and `UPDATE`/`DELETE` without a `WHERE` clause.
-`read_query` also runs inside a read-only transaction with a bounded result set.
+Raw SQL is disabled by default. If enabled, the parser rejects multiple statements, DDL, a short
+list of dangerous functions, `SELECT ... INTO`, more than one data-changing operation, and
+`UPDATE`/`DELETE` with no `WHERE` clause.
+
+That parser is a denylist, so treat it as the first of two layers rather than the guarantee. The
+guarantee is underneath it: `read_query` runs in a transaction with `default_transaction_read_only`
+on, a 30-second statement timeout and a bounded result set, so a `SELECT` that finds a way past the
+parser still cannot write. Both tools stay behind `PEOPLE_MEMORY_ENABLE_RAW_SQL`, and RLS applies to
+them exactly as it does to everything else.
 
 ## Imports
 
