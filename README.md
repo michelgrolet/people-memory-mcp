@@ -1,13 +1,17 @@
 # People Memory
 
-Give your AI agent a private, durable memory of everyone you know.
+**How do you give an AI agent persistent memory about people?** Point it at a real database instead
+of a context window. People Memory is that database: an MCP server, a PostgreSQL schema, an optional
+REST API, a browser UI, importers, and agent skills, all built around one graph of people, orgs, and
+facts that survives every session. Add it once and Claude Code, Codex, or any other MCP client stops
+forgetting who your mother-in-law is between conversations.
 
-People Memory is a personal people graph with an MCP server, PostgreSQL schema, optional REST API,
-browser UI, importers, and agent skills. It remembers people across conversations, retrieves someone
-as soon as you mention them, records durable facts, and asks before it merges ambiguous identities.
+The server retrieves someone the moment you mention them, records durable facts as they come up, and
+asks before it merges two people who might not be the same person. The graph, not the chat log, is
+what remembers.
 
-Your data stays in your PostgreSQL database. The repository contains no hosted service, telemetry,
-contact data, or credentials.
+Your data stays in your own PostgreSQL database. The repository contains no hosted service, no
+telemetry, no contact data, and no credentials.
 
 ## What it does
 
