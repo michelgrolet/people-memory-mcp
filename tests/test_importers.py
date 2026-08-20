@@ -225,6 +225,31 @@ def test_fetch_linkedin_connections_raises_readable_error_when_not_collated_yet(
         fetch_linkedin_connections("fake-token")
 
 
+def test_fetch_linkedin_connections_treats_404_after_real_pages_as_end_of_pagination() -> None:
+    # LinkedIn's own guidance: keep paginating "until you receive... No data found for this
+    # memberId" — a 404 mid-pagination is the expected terminator, not a fatal error. Only a
+    # 404 on the FIRST request (nothing collected yet) should still raise (domain not collated).
+    page_one = _snapshot_page(
+        [{"First Name": "Ada", "Last Name": "Lovelace"}],
+        next_href="/rest/memberSnapshotData?q=criteria&domain=CONNECTIONS&start=2",
+    )
+    error_body = json.dumps({"message": "No data found for this domain and memberId."}).encode()
+    http_error = urllib.error.HTTPError(
+        url="https://api.linkedin.com/rest/memberSnapshotData",
+        code=404,
+        msg="Not Found",
+        hdrs=None,
+        fp=io.BytesIO(error_body),
+    )
+    with patch(
+        "people_memory.importers.urllib.request.urlopen",
+        side_effect=[_FakeResponse(page_one), http_error],
+    ) as mock_urlopen:
+        records = fetch_linkedin_connections("fake-token")
+    assert [record.full_name for record in records] == ["Ada Lovelace"]
+    assert mock_urlopen.call_count == 2
+
+
 def test_fetch_linkedin_connections_raises_readable_error_on_non_json_body() -> None:
     http_error = urllib.error.HTTPError(
         url="https://api.linkedin.com/rest/memberSnapshotData",

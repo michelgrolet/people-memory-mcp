@@ -102,6 +102,12 @@ def fetch_linkedin_connections(access_token: str, *, timeout: float = 30.0) -> l
 
     Raises RuntimeError (with LinkedIn's own message) if the domain isn't collated
     yet — common right after a member first consents, LinkedIn processes it async.
+    That case is indistinguishable, by message text alone, from LinkedIn's own documented
+    end-of-pagination signal (a 404 is the expected way this endpoint says "no more pages" —
+    see the Member Snapshot API pagination guidance): both come back as a 404 whose body says
+    "No data found for this domain and memberId." So a 404 is only fatal on the very FIRST
+    request (nothing collected yet); once at least one page has come back with real data, the
+    same 404 just means pagination is exhausted, not that the domain vanished.
     """
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -116,6 +122,9 @@ def fetch_linkedin_connections(access_token: str, *, timeout: float = 30.0) -> l
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 payload = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
+            if exc.code == 404 and records:
+                # End of pagination, not a real error — see the docstring above.
+                break
             raw_body = exc.read().decode("utf-8", errors="replace")
             try:
                 body = json.loads(raw_body)
