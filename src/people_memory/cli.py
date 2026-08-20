@@ -148,6 +148,17 @@ def _import_record(repo: GraphRepository, record, accept_similar_as_new: bool = 
 
 
 def _preview(records) -> dict:
+    """What the import would do, as far as it can be known without writing.
+
+    The organisation section needs the database, so it is best effort: a preview that cannot reach
+    the graph still previews the records, and says why the rest is missing. It exists because a dry
+    run that counts records cannot answer the only question worth asking after a deduplication
+    pass — is this import about to recreate what I just merged?
+    """
+    try:
+        orgs = _repo().preview_orgs([record.organization for record in records])
+    except Exception as exc:  # noqa: BLE001 - a preview must never fail on the preview
+        orgs = {"unavailable": str(exc)}
     sample = [
         {
             "full_name": record.full_name,
@@ -158,7 +169,7 @@ def _preview(records) -> dict:
         }
         for record in records[:5]
     ]
-    return {"records": len(records), "sample": sample}
+    return {"records": len(records), "organizations": orgs, "sample": sample}
 
 
 def _apply_import(
