@@ -38,6 +38,39 @@ def _normalize_name(value: str) -> str:
     return " ".join(re.findall(r"[a-z0-9]+", without_marks))
 
 
+ORG_LEGAL_SUFFIXES = frozenset(
+    {
+        "sa", "sas", "sasu", "sarl", "eurl", "sci", "snc", "cie",
+        "inc", "llc", "ltd", "limited", "plc", "corp", "corporation", "company", "co",
+        "gmbh", "ag", "bv", "nv", "ab", "oy", "aps", "spa", "srl", "pty", "kk",
+    }
+)  # fmt: skip
+
+ORG_SYNONYMS = {"freelancer": "freelance", "freelancing": "freelance"}
+
+
+def _normalize_org_name(value: str) -> str:
+    """The key two spellings of the same organisation share.
+
+    Case, accents, punctuation, spacing and a trailing legal suffix carry no information about
+    which organisation is meant, so they are removed. Everything else is kept, on purpose: this
+    function decides identity, and resemblance is not identity. "BNP Paribas" and "BNP Paribas
+    CIB" keep different keys, as do "CS GROUP" and "NAVAL GROUP" — merging two real companies is
+    a worse outcome than a duplicate row, and a similarity threshold loose enough to catch
+    "Armée de terre" / "Armée de Terre" is loose enough to catch those too.
+
+    Names that mean the same thing without sharing a spelling ("2600" / "Ecole 2600") are out of
+    reach here by design; they are handled by `org_aliases`, which records a human's merge.
+
+    The same rule exists in SQL as `org_norm()`, which is what the database indexes and what the
+    `orgs` insert trigger enforces for callers that never go through this file.
+    """
+    tokens = _normalize_name(value).split()
+    while len(tokens) > 1 and tokens[-1] in ORG_LEGAL_SUFFIXES:
+        tokens.pop()
+    return " ".join(ORG_SYNONYMS.get(token, token) for token in tokens)
+
+
 def _conflicts_with(key: str, existing: Any, incoming: Any) -> bool:
     """Whether a stored value and an incoming one genuinely disagree.
 
@@ -239,6 +272,91 @@ class GraphRepository:
         )
         return person
 
+    def _existing_org(self, conn, name: str) -> dict[str, Any] | None:
+        """The organisation this name already refers to, or None. Never writes."""
+        incoming = (name or "").strip()
+        if not incoming:
+            return None
+        row = conn.execute("select id, name from orgs where name = %s", (incoming,)).fetchone()
+        if row:
+            return row
+        key = _normalize_org_name(incoming)
+        if not key:
+            return None
+        # Spelled differently, same organisation. `org_norm(name)` is indexed.
+        row = conn.execute(
+            "select id, name from orgs where org_norm(name) = %s order by id limit 1", (key,)
+        ).fetchone()
+        if row:
+            return row
+        # Spelled differently, same organisation, and only a human could have known: a merge
+        # decided this once and `org_aliases` kept it.
+        return conn.execute(
+            """
+            select o.id, o.name
+            from org_aliases a join orgs o on o.id = a.org_id
+            where a.alias = %s
+            limit 1
+            """,
+            (key,),
+        ).fetchone()
+
+    def preview_orgs(self, names: list[str]) -> dict[str, Any]:
+        """What an import would do to `orgs`, without writing a row.
+
+        A dry run that only counts records cannot answer the question that matters after a
+        deduplication pass — will this import recreate what I just merged? — so it answers it here.
+        """
+        reused: dict[str, str] = {}
+        would_create: list[str] = []
+        pending: dict[str, str] = {}
+        seen: set[str] = set()
+        with self.db.connection() as conn:
+            for raw in names:
+                name = (raw or "").strip()
+                if not name or name in seen:
+                    continue
+                seen.add(name)
+                existing = self._existing_org(conn, name)
+                if existing:
+                    reused[name] = existing["name"]
+                    continue
+                # Two new spellings inside the same batch are still one organisation.
+                key = _normalize_org_name(name)
+                if key and key in pending:
+                    reused[name] = pending[key]
+                    continue
+                if key:
+                    pending[key] = name
+                would_create.append(name)
+        return {
+            "names": len(seen),
+            "reused_existing": len(reused),
+            "would_create": sorted(would_create),
+            "resolved": dict(sorted(reused.items())),
+        }
+
+    def find_or_create_org(self, conn, name: str) -> dict[str, Any] | None:
+        """The organisation for this name, creating it only when it is genuinely new.
+
+        The database canonicalises the name a second time on insert (trigger
+        `orgs_canonicalize_name_before_insert`), so a name this method believes to be new but the
+        database recognises still lands on the existing row instead of duplicating it.
+        """
+        existing = self._existing_org(conn, name)
+        if existing:
+            return existing
+        incoming = (name or "").strip()
+        if not incoming:
+            return None
+        return conn.execute(
+            """
+            insert into orgs (name) values (%s)
+            on conflict (name) do update set name = excluded.name returning id, name
+            """,
+            (incoming,),
+        ).fetchone()
+
     def remember_person(
         self,
         *,
@@ -305,6 +423,15 @@ class GraphRepository:
                         ),
                         "candidates": similar,
                     }
+
+            if current_org:
+                # Under the stored spelling, not the incoming one — otherwise "Armée de terre"
+                # arriving against a stored "Armée de Terre" reads as a conflict and the whole
+                # person comes back as needs_confirmation over a capital letter. Lookup only: an
+                # import that ends in needs_confirmation must not leave a new organisation behind.
+                known_org = self._existing_org(conn, current_org)
+                if known_org:
+                    current_org = known_org["name"]
 
             fields = {
                 "current_org": current_org,
@@ -386,14 +513,9 @@ class GraphRepository:
                         """,
                         (person_id, kind, normalized, source),
                     )
-            if current_org:
-                org_id = conn.execute(
-                    """
-                    insert into orgs (name) values (%s)
-                    on conflict (name) do update set name = excluded.name returning id
-                    """,
-                    (current_org,),
-                ).fetchone()["id"]
+            org = self.find_or_create_org(conn, current_org) if current_org else None
+            if org:
+                org_id = org["id"]
                 conn.execute(
                     """
                     insert into affiliations (person_id, org_id, role, source)
