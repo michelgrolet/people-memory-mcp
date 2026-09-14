@@ -126,7 +126,53 @@ class GraphRepository:
         )
         return {"ok": True, **(counts or {})}
 
-    def search_people(self, query: str, limit: int = 20) -> list[dict[str, Any]]:
+    FUZZY_FLOOR = 0.62
+
+    def fuzzy_people(self, query: str, limit: int = 20,
+                     floor: float | None = None) -> list[dict[str, Any]]:
+        """Rank every person by name similarity to `query`, loosely.
+
+        Exists because a name typed from memory is a name typed wrong. `search_people` matches
+        substrings, so one wrong letter returns nothing at all: "Dominique Faurien" found no
+        trace of "Dominique Forien" and a duplicate was created next to her (2026-09-14, his
+        words: « t'aurais du check si t'avvais pas fait une typo »). The write path already
+        compared names this way at 0.78; the read path did not compare them at all.
+
+        The floor is deliberately lower than the write path's. A read costs nothing when it is
+        wrong, so the cheap failure is showing one name too many, never showing none.
+        """
+        cutoff = self.FUZZY_FLOOR if floor is None else floor
+        needle = (query or "").strip()
+        if not needle:
+            return []
+        people = self.db.fetch_all(
+            '''select p.id, p.full_name, p.current_org, p."current_role", p.city, p.country,
+                      p.tie_strength, p.summary, p.last_contact, p.days_since_contact
+               from person p'''
+        )
+        scored = []
+        for person in people:
+            score = _name_similarity(person["full_name"] or "", needle)
+            if score >= cutoff:
+                scored.append({**person, "similarity": round(score, 3)})
+        scored.sort(
+            key=lambda person: (-person["similarity"], -(person.get("tie_strength") or 0))
+        )
+        return scored[: min(max(limit, 1), 100)]
+
+    def search_people(self, query: str, limit: int = 20,
+                      fuzzy: bool = True) -> list[dict[str, Any]]:
+        """Exact-ish search first, then near-misses on the name when it found nothing.
+
+        `fuzzy` defaults to True on purpose: the caller who most needs the correction is the one
+        who did not think to ask for it.
+        """
+        exact = self._search_people_exact(query, limit)
+        if exact or not fuzzy:
+            return exact
+        return self.fuzzy_people(query, limit)
+
+    def _search_people_exact(self, query: str, limit: int = 20) -> list[dict[str, Any]]:
         needle = f"%{query.strip()}%"
         return self.db.fetch_all(
             """

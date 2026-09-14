@@ -54,9 +54,25 @@ def graph_status() -> dict[str, Any]:
 
 
 @mcp.tool()
-def search_people(query: str, limit: int = 20) -> list[dict[str, Any]]:
-    """Search people by name, organization, role, city, identifier, summary, or fact."""
-    return _repo().search_people(query, limit)
+def search_people(query: str, limit: int = 20, fuzzy: bool = True) -> list[dict[str, Any]]:
+    """Search people by name, organization, role, city, identifier, summary, or fact.
+
+    When the exact search finds nothing and `fuzzy` is on, near-miss names come back instead,
+    each carrying a `similarity` score. A name typed from memory is often a name typed wrong,
+    so an empty result is nearly always a spelling that missed rather than a person absent.
+    """
+    return _repo().search_people(query, limit, fuzzy=fuzzy)
+
+
+@mcp.tool()
+def fuzzy_people(query: str, limit: int = 20, floor: float = 0.62) -> list[dict[str, Any]]:
+    """Rank every person by how close their name is to `query`, however it was spelled.
+
+    Use it before creating anyone, and whenever a name was heard rather than read: a voice note,
+    a phone call, a name someone spelled out. Lower `floor` to cast wider; 0.5 catches almost
+    anything, 0.8 only catches a slip of one or two letters.
+    """
+    return _repo().fuzzy_people(query, limit, floor=floor)
 
 
 @mcp.tool()
