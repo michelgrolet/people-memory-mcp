@@ -39,6 +39,10 @@ Use `remember_person` for core fields and one simple fact. Use `add_fact`, `reco
 Do not store passing jokes, guesses, judgments, full message bodies, or facts about the user's inner
 life. Keep compact facts that help a future conversation.
 
+## Record the relationship when the evidence appears
+
+A fact about two people also needs a `connect_people` record in the same turn. For example, an explicit statement that the user and a contact are good friends creates a `friend` link; a statement that someone lives at another person’s home supports a `knows` link with the housing fact in its note. Record this without waiting for a separate request. Preserve an existing more specific relationship and check the saved links before closing the turn. A shared event alone does not establish friendship.
+
 ## Resolve before writing
 
 Resolve by email or phone, then exact name. If a tool returns `needs_confirmation`, ask the user and

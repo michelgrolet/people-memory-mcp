@@ -903,6 +903,9 @@
       <label class="toggle">Show unconnected people
         <input type="checkbox" id="showIsolated"><span class="sw-track"></span>
       </label>
+      <label class="toggle">Show my links
+        <input type="checkbox" id="showMyLinks"><span class="sw-track"></span>
+      </label>
       <label class="toggle">Show organizations
         <input type="checkbox" id="showOrgs" checked><span class="sw-track"></span>
       </label>
@@ -2673,6 +2676,7 @@ function famLayout(edges) {
 // ── graph model ───────────────────────────────────────────
 let nodes = [], links = [], idx = new Map(), degree = [];
 let showIsolated = false, showOrgs = true, showLabels = true, colorByKind = false, showAgents = true;
+let showMyLinks = false;
 let treeMode = false, treeRoot = null;
 let orgFilter = "", tieFilter = new Set(ALL_TIES);
 let selected = null;
@@ -2682,6 +2686,8 @@ let selectedOrgId = null;
 const pinned = new Set();
 
 function buildGraph() {
+  const me = accountPersonId();
+  const visibleLink = id => showMyLinks || me == null || id !== me;
   const prev = new Map(nodes.map(n => [n.key, n]));
   nodes = []; links = []; idx = new Map();
   const add = (key, o) => {
@@ -2745,7 +2751,7 @@ function buildGraph() {
     DATA.affs.forEach(a => {
       if (orgPeople.get(a.org_id).size < 2) return;
       const x = addP(a.person_id), y = addO(a.org_id);
-      if (x >= 0 && y >= 0) links.push({ s: x, t: y, kind: "org" });
+      if (x >= 0 && y >= 0 && visibleLink(a.person_id)) links.push({ s: x, t: y, kind: "org" });
     });
     // a suborg and its parent are one company seen at two depths (YouTube under Google), and
     // without this line the graph shows them as two unrelated diamonds. Whichever side already
@@ -2757,7 +2763,7 @@ function buildGraph() {
       if (x >= 0 && y >= 0) links.push({ s: x, t: y, kind: "suborg" });
     });
   }
-  DATA.edges.forEach(e => { const x = addP(e.a), y = addP(e.b); if (x >= 0 && y >= 0) links.push({ s: x, t: y, kind: e.kind, ea: e.a, eb: e.b }); });
+  DATA.edges.forEach(e => { const x = addP(e.a), y = addP(e.b); if (x >= 0 && y >= 0 && visibleLink(e.a) && visibleLink(e.b)) links.push({ s: x, t: y, kind: e.kind, ea: e.a, eb: e.b }); });
   }
 
   degree = new Array(nodes.length).fill(0);
@@ -2777,12 +2783,18 @@ let neigh = [];
  * Whose tree opens when nothing is selected: the account holder, matched on the signed-in email.
  * Failing that, whoever has the most family links recorded — a wrong guess costs one click.
  */
-function defaultTreeRoot() {
+function accountPersonId() {
   const me = myEmail.toLowerCase();
   if (me) {
     const hit = DATA.people.find(p => (p.identifiers || []).some(i => i.kind === "email" && (i.value || "").toLowerCase() === me));
     if (hit) return hit.id;
   }
+  return null;
+}
+
+function defaultTreeRoot() {
+  const me = accountPersonId();
+  if (me != null) return me;
   const count = new Map();
   for (const e of DATA.edges) if (TREE_KINDS.has(e.kind)) for (const id of [e.a, e.b]) count.set(id, (count.get(id) || 0) + 1);
   let best = null, top = 0;
@@ -4687,6 +4699,7 @@ function wire() {
   });
   $("orgFilter").onchange = () => { orgFilter = $("orgFilter").value; renderActiveFilters(); invalidate(); };
   $("showIsolated").onchange = e => { showIsolated = e.target.checked; buildGraph(); reheat(.5); };
+  $("showMyLinks").onchange = e => { showMyLinks = e.target.checked; buildGraph(); reheat(.5); };
   $("showOrgs").onchange = e => { showOrgs = e.target.checked; buildGraph(); reheat(.5); };
   $("showLabels").onchange = e => { showLabels = e.target.checked; invalidate(); };
   $("colorByKind").onchange = e => {
@@ -4700,6 +4713,8 @@ function wire() {
     orgFilter = ""; tieFilter = new Set(ALL_TIES); egoSet = null; treeMode = false; treeRoot = null;
     $("treeBtn").classList.remove("on");
     showIsolated = false; showOrgs = showLabels = showAgents = true; colorByKind = false;
+    showMyLinks = false;
+    $("showMyLinks").checked = false;
     $("showIsolated").checked = false;
     $("showOrgs").checked = $("showLabels").checked = $("showAgents").checked = true;
     $("colorByKind").checked = false;
