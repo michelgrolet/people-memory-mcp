@@ -27,6 +27,7 @@ PERSON_FIELDS = {
     "met_where",
     "met_when",
     "summary",
+    "call_every_days",
 }
 
 
@@ -691,6 +692,30 @@ class GraphRepository:
             """,
             (min_days, min(max(limit, 1), 200)),
         )
+
+    def calls_due(self, limit: int = 30, include_upcoming: bool = False) -> list[dict[str, Any]]:
+        return self.db.fetch_all(
+            """
+            select * from calls_due
+            where overdue_days >= 0 or %s
+            order by call_due_on, name
+            limit %s
+            """,
+            (include_upcoming, min(max(limit, 1), 200)),
+        )
+
+    def set_call_cadence(self, person_id: int, every_days: int | None) -> dict[str, Any]:
+        if every_days is not None and every_days <= 0:
+            raise ValueError("every_days must be a positive number of days, or null to clear")
+        row = self.db.fetch_one(
+            """
+            update people set call_every_days = %s, updated_at = now()
+            where id = %s
+            returning id, full_name, call_every_days
+            """,
+            (every_days, person_id),
+        )
+        return row or {}
 
     def find_intro_path(
         self, target_org: str, from_person: str, max_depth: int = 3

@@ -1166,6 +1166,30 @@ function ago(days) {
   const y = days / 365;
   return (y < 10 ? y.toFixed(1) : Math.round(y)) + "a";
 }
+// A calendar date in the viewer's own day, as YYYY-MM-DD. `toISOString` would give the UTC day,
+// which after 22:00 in Paris is already tomorrow.
+function localIso(d) {
+  const x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset());
+  return x.toISOString().slice(0, 10);
+}
+// Days until a call is due: negative means it is late. Null when no cadence is set.
+function callDueIn(p) {
+  if (!p.callEvery || !p.callDueOn) return null;
+  const due = new Date(p.callDueOn + "T00:00:00");
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.round((due - today) / 86400000);
+}
+function callDueLabel(p) {
+  const d = callDueIn(p);
+  if (d == null) return "";
+  if (d < 0) return `call overdue ${-d}d`;
+  if (d === 0) return "call due today";
+  return `call in ${d}d`;
+}
+function callDueColor(p) {
+  const d = callDueIn(p);
+  return d == null ? "" : d < 0 ? "var(--red)" : d <= 2 ? "var(--accent)" : "var(--muted)";
+}
 function fmtSyncWhen(ms) {
   if (!ms) return "";
   return new Date(ms).toLocaleString(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -1484,6 +1508,8 @@ async function load() {
     birthdayMd: p.birthday_md, metWhere: p.met_where, metWhen: p.met_when,
     linkedinUrl: p.linkedin_url, summary: p.summary,
     lastContact: p.last_contact, days: p.days_since_contact,
+    callEvery: p.call_every_days, lastCall: p.last_call, daysSinceCall: p.days_since_call,
+    callDueOn: p.call_due_on,
     identifiers: identsBy.get(p.id) || [], facts: factsBy.get(p.id) || [],
     affiliations: affsBy.get(p.id) || [], interactions: interBy.get(p.id) || [],
     companions: compBy.get(p.id) || [],
@@ -1608,12 +1634,25 @@ function computeInsights() {
     .filter(c => c.total >= 3)
     .sort((a, b) => b.total - a.total);
 
-  return { bridges: bridges.slice(0, 15), connectors: connectors.slice(0, 10) };
+  // Calls due: everyone with a cadence, latest first. Upcoming ones stay in the list so the
+  // week ahead is visible, not only what is already late.
+  const calls = DATA.people
+    .filter(p => p.callEvery && p.kind !== "agent")
+    .map(p => ({ id: p.id, name: p.name, dueIn: callDueIn(p), label: callDueLabel(p), color: callDueColor(p), last: p.lastCall }))
+    .sort((a, b) => a.dueIn - b.dueIn);
+
+  return { bridges: bridges.slice(0, 15), connectors: connectors.slice(0, 10), calls };
 }
 
 function renderInsights() {
-  const { bridges, connectors } = computeInsights();
+  const { bridges, connectors, calls } = computeInsights();
   const goto = id => { $("insightsPop").classList.remove("open"); select(id); };
+  const rowsCalls = calls.length
+    ? calls.map(c => `<div class="row-item">
+        <a class="lbl" data-goto="${c.id}">${esc(c.name)}<span class="k">${c.last ? `last call ${esc(c.last)}` : "no call recorded"}</span></a>
+        <span class="k" style="color:${c.color}">${esc(c.label)}</span>
+      </div>`).join("")
+    : `<div class="none">none yet — set "Call every" on a person</div>`;
   const rowsB = bridges.length
     ? bridges.map(b => `<div class="row-item">
         <a class="lbl" data-goto="${b.id}">${esc(b.name)}<span class="k">${esc(b.orgA)} ↔ ${esc(b.orgB)}</span></a>
@@ -1626,6 +1665,7 @@ function renderInsights() {
       </div>`).join("")
     : `<div class="none">no super connectors yet</div>`;
   $("insightsList").innerHTML = `
+    <div class="grp"><h4>Calls due</h4>${rowsCalls}</div>
     <div class="grp"><h4>Unexpected bridges</h4>${rowsB}</div>
     <div class="grp"><h4>Super connectors</h4>${rowsC}</div>
   `;
@@ -3452,6 +3492,13 @@ function renderDrawer(p) {
           <div class="fld"><label class="fl">Where you met</label><input id="f_mw" value="${v("metWhere")}"></div>
           <div class="fld"><label class="fl">When</label><input id="f_mn" value="${v("metWhen")}"></div>
         </div>
+        ${p.kind === "agent" ? "" : `
+        <div class="fld"><label class="fl">Call every (days) <em class="fl-hint" id="callOut">${esc(callHint(p))}</em></label>
+          <div class="add" style="margin-top:0">
+            <input type="number" min="1" step="1" id="f_call" value="${p.callEvery ?? ""}" placeholder="e.g. 14" style="max-width:110px">
+            <button class="btn btn-sm" id="logCall" title="Record a call today">called today</button>
+          </div>
+        </div>`}
         <div class="fld"><label class="fl">LinkedIn
           <a id="liOpen" class="fl-link" href="${v("linkedinUrl")}" target="_blank" rel="noopener"
              style="${p.linkedinUrl ? "" : "display:none"}">open ↗</a></label>
@@ -3659,6 +3706,12 @@ function renderDrawer(p) {
     chk(await sb.from("affiliations").upsert({ person_id: p.id, org_id: org.id, role, source: "dashboard" }));
     chk(await sb.from("people").update({ current_org: org.name, current_role: role || null }).eq("id", p.id));
   }, "organization added");
+  if ($("logCall")) $("logCall").onclick = () => run(async () => {
+    chk(await sb.from("interactions").insert({
+      person_id: p.id, happened_on: localIso(new Date()), channel: "call",
+      summary: null, source: "dashboard",
+    }));
+  }, "call recorded");
   $("addX").onclick = () => run(async () => {
     const day = $("xd").value; if (!day) throw new Error("Date is required.");
     chk(await sb.from("interactions").insert({
@@ -3707,7 +3760,16 @@ const FIELDS = {
   f_mn:      { col: "met_when",     key: "metWhen" },
   f_li:      { col: "linkedin_url", key: "linkedinUrl" },
   f_sum:     { col: "summary",      key: "summary" },
+  f_call:    { col: "call_every_days", key: "callEvery", num: true },
 };
+
+// What the cadence field says under its label: when you last really talked, and when the next
+// one is due. A message is not a call, so `lastCall` can be older than `lastContact`.
+function callHint(p) {
+  if (!p.callEvery) return p.lastCall ? `last call ${ago(p.daysSinceCall)}` : "";
+  const last = p.lastCall ? `last call ${ago(p.daysSinceCall)}` : "no call recorded";
+  return `${last} · ${callDueLabel(p)}`;
+}
 
 function headChips(p) {
   if (p.kind === "agent") {
@@ -3717,7 +3779,8 @@ function headChips(p) {
   }
   return `<span class="chip" style="color:${tieColor(p.tie)};border-color:${tieColor(p.tie)}66">
       <span class="dot" style="background:${tieColor(p.tie)}"></span>${esc(tieLabel(p.tie))}</span>
-    ${p.lastContact ? `<span class="chip">seen ${ago(p.days)}</span>` : ""}`;
+    ${p.lastContact ? `<span class="chip">seen ${ago(p.days)}</span>` : ""}
+    ${p.callEvery ? `<span class="chip" style="color:${callDueColor(p)};border-color:${callDueColor(p)}66">${esc(callDueLabel(p))}</span>` : ""}`;
 }
 
 function wireInlineFields(p) {
@@ -3763,6 +3826,14 @@ function wireInlineFields(p) {
       p._hay = norm([p.name, p.org, p.city, p.role, p.country, p.summary].filter(Boolean).join(" "));
       hint("saved"); setTimeout(idle, 1600);
 
+      if (id === "f_call") {
+        // The due date is computed by the database view; recompute the same way here so the
+        // hint does not wait for a reload.
+        const base = p.lastCall || localIso(new Date());
+        p.callDueOn = val ? localIso(new Date(base + "T00:00:00").getTime() + val * 86400000) : null;
+        $("callOut").textContent = callHint(p);
+        $("drSub").innerHTML = headChips(p);
+      }
       if (id === "f_name" || id === "f_tie") {
         const av = $("drAvatar");
         av.textContent = initials(p.name);

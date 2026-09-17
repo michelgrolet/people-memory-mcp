@@ -6,6 +6,11 @@ All notable changes to People Memory are documented here.
 
 ### Added
 
+- **Call cadence.** A person can carry how often you want to actually talk to them, in days. The
+  clock reads the interactions: a call, a video call or time spent in person resets it, a message
+  does not. The dashboard shows the state on the card and lists who is due under Insights, with a
+  "called today" button; the MCP gets `set_call_cadence` and `calls_due`, and the `calls_due` view
+  answers the same question in SQL.
 - **Family tree view.** Clicking a person draws their bloodline: every ancestor and descendant, their
   brothers and sisters, and each of those spouses as a leaf. A spouse's own parents and siblings stay
   out, because drawing them puts two unrelated families on the same rows and claims a kinship that

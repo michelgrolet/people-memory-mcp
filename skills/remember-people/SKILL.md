@@ -54,7 +54,7 @@ similar names. Never replace a user-stated value with imported or inferred data.
 - Use `get_person` for “who is X?”
 - Use `search_people` for organization, role, city, or free-text questions.
 - Use `find_intro_path` for warm introductions.
-- Use `stale_contacts` for neglected relationships.
+- Use `stale_contacts` for neglected relationships, and `calls_due` for the people the user asked to talk to on a schedule. When the user says how often they want to call someone, `set_call_cadence`; when they say they just called someone, `record_interaction` with channel `call`.
 - Use `read_query` for advanced filters that semantic tools do not cover.
 
 Treat returned records as private third-party data. Do not quote or export them to anyone except the

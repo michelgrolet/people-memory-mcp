@@ -157,6 +157,8 @@ distribution.
 | `connect_people` | Record how two people know each other |
 | `find_intro_path` | Find warm introduction paths into an organization |
 | `stale_contacts` | Find strong relationships that have gone quiet |
+| `set_call_cadence` | Say how often you want a live conversation with someone, in days |
+| `calls_due` | Who to call: people whose last call, video call or time in person is older than their cadence |
 | `read_query` | Run one guarded `SELECT` for advanced analysis |
 | `write_query` | Run one guarded `INSERT`, `UPDATE`, or `DELETE` |
 

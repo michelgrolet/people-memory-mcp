@@ -18,6 +18,8 @@ def test_server_exposes_semantic_tools() -> None:
         "connect_people",
         "find_intro_path",
         "stale_contacts",
+        "set_call_cadence",
+        "calls_due",
         "read_query",
         "write_query",
     } <= names

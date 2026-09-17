@@ -205,6 +205,29 @@ def stale_contacts(min_days: int = 180, limit: int = 30) -> list[dict[str, Any]]
 
 
 @mcp.tool()
+def set_call_cadence(person_name: str, every_days: int | None) -> dict[str, Any]:
+    """Set how often you want a live conversation with someone, in days. None clears it.
+
+    The clock resets on any interaction that is a call, a video call, or time spent in person.
+    Messages do not count. Record the call with record_interaction and channel "call".
+    """
+    person_id, unresolved = _resolve(person_name)
+    if unresolved:
+        return unresolved
+    return {"status": "updated", "person": _repo().set_call_cadence(person_id, every_days)}
+
+
+@mcp.tool()
+def calls_due(limit: int = 30, include_upcoming: bool = False) -> list[dict[str, Any]]:
+    """Who to call: people with a cadence whose last live conversation is older than it.
+
+    overdue_days is how late the call is; with include_upcoming it goes negative for calls still
+    ahead. last_call is null when no live conversation was ever recorded.
+    """
+    return _repo().calls_due(limit, include_upcoming)
+
+
+@mcp.tool()
 def read_query(query: str, max_rows: int = 500) -> list[dict[str, Any]]:
     """Run one guarded SELECT for advanced graph analysis. No DDL or data changes."""
     if not _settings().enable_raw_sql:
