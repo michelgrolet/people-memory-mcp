@@ -760,8 +760,7 @@
     padding:5px 0;border-top:1px solid var(--line);font-size:11.5px;color:var(--txt2);
   }
   .ca-gap{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap}
-  .ca-del{border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:2px 4px}
-  .ca-del:hover{color:var(--red)}
+  .ca-hist .ca-del{padding:4px 7px;font-size:10.5px}
 
   /* ── merge window ────────────────────────────────────── */
   /* Sits above the cleanup screen rather than replacing it: the merge is answered and the list is
@@ -2353,7 +2352,7 @@ function callRowHtml({ p, history }) {
       <span>${fmtDay(h.happened_on)}</span><span>${esc(h.channel)}</span>
       <span class="ca-sum">${esc(h.summary || "")}</span>
       <span class="ca-gap">${h.gap == null ? "first logged" : `${h.gap} d after the previous`}</span>
-      <button class="ca-del" data-ca-del="${h.id}" title="Delete this call">×</button>
+      <button class="cl-act danger ca-del" data-ca-del="${h.id}">delete</button>
     </li>`).join("");
   return `<div class="ca-row">
     <div class="ca-top">
@@ -2370,6 +2369,7 @@ function callRowHtml({ p, history }) {
       <span class="cl-acts">
         <button class="cl-act" data-ca-today="${p.id}">called today</button>
         <button class="cl-act" data-ca-log="${p.id}">other date</button>
+        <button class="cl-act danger" data-ca-stop="${p.id}" title="Stop scheduling calls with ${esc(p.name)}. Logged calls stay.">remove</button>
       </span>
     </div>
     ${history.length ? `<details class="ca-hist" data-ca-hist="${p.id}"${callsOpenHist.has(p.id) ? " open" : ""}>
@@ -2399,6 +2399,8 @@ function renderCalls() {
       $("callsModal").querySelector(".cl-body").scrollTop = 0;
       $("caDate").focus();
     });
+  list.querySelectorAll("[data-ca-stop]").forEach(el =>
+    el.onclick = () => callsSetEvery(Number(el.dataset.caStop), ""));
   list.querySelectorAll("[data-ca-del]").forEach(el =>
     el.onclick = () => callsWrite(() => sb.from("interactions").delete().eq("id", Number(el.dataset.caDel)), "call deleted"));
 }
