@@ -1582,7 +1582,7 @@ async function load() {
     linkedinUrl: p.linkedin_url, summary: p.summary,
     lastContact: p.last_contact, days: p.days_since_contact,
     callEvery: p.call_every_days, lastCall: p.last_call, daysSinceCall: p.days_since_call,
-    callDueOn: p.call_due_on,
+    callDueOn: p.call_due_on, createdOn: p.created_at ? String(p.created_at).slice(0, 10) : null,
     identifiers: identsBy.get(p.id) || [], facts: factsBy.get(p.id) || [],
     affiliations: affsBy.get(p.id) || [], interactions: interBy.get(p.id) || [],
     companions: compBy.get(p.id) || [],
@@ -2352,7 +2352,7 @@ function callRowHtml({ p, history }) {
       <span>${fmtDay(h.happened_on)}</span><span>${esc(h.channel)}</span>
       <span class="ca-sum">${esc(h.summary || "")}</span>
       <span class="ca-gap">${h.gap == null ? "first logged" : `${h.gap} d after the previous`}</span>
-      <button class="cl-act danger ca-del" data-ca-del="${h.id}">delete</button>
+      <button class="cl-act danger ca-del" data-ca-del="${h.id}" data-person="${p.id}">delete</button>
     </li>`).join("");
   return `<div class="ca-row">
     <div class="ca-top">
@@ -2402,34 +2402,68 @@ function renderCalls() {
   list.querySelectorAll("[data-ca-stop]").forEach(el =>
     el.onclick = () => callsSetEvery(Number(el.dataset.caStop), ""));
   list.querySelectorAll("[data-ca-del]").forEach(el =>
-    el.onclick = () => callsWrite(() => sb.from("interactions").delete().eq("id", Number(el.dataset.caDel)), "call deleted"));
+    el.onclick = () => callsDelete(Number(el.dataset.person), Number(el.dataset.caDel)));
 }
 
-// Every write reloads the graph, so the due dates on screen are the database's, never a guess.
-async function callsWrite(op, done) {
-  const { error } = await op();
-  if (error) { toast(error.message, "err"); return false; }
-  await reload(selected);
+// The `person` view computes last_call and call_due_on. After a write the same rule runs here on the
+// record already in memory, so the window answers at once instead of after a full reload.
+function callsRecompute(p) {
+  const today = localIso(new Date());
+  const utc = iso => Date.parse(iso + "T00:00:00Z");
+  const daysSince = iso => iso ? Math.round((utc(today) - utc(iso)) / 86400000) : null;
+  p.lastCall = callHistory(p.interactions)[0]?.happened_on || null;
+  p.daysSinceCall = daysSince(p.lastCall);
+  p.lastContact = p.interactions.reduce((max, i) => (i.happened_on > max ? i.happened_on : max), "") || null;
+  p.days = daysSince(p.lastContact || p.createdOn);
+  const base = p.lastCall || p.createdOn || today;
+  p.callDueOn = p.callEvery ? new Date(utc(base) + p.callEvery * 86400000).toISOString().slice(0, 10) : null;
+}
+// Called once the database accepted the write, never before.
+function callsDone(p, msg) {
+  callsRecompute(p);
   if (callsOpen) renderCalls();
-  toast(done);
+  callsBadge();
+  if (selected === p.id) renderDrawer(p);
+  toast(msg);
   return true;
 }
+// One log at a time: a second click before the first insert returns would pass the same-day check.
+let callsSaving = false;
 async function callsLog(id, day, channel, summary) {
   const p = byId.get(id);
   if (day > localIso(new Date())) { toast("A call cannot be logged in the future", "err"); return false; }
+  if (callsSaving) return false;
   if (p.interactions.some(i => i.happened_on === day && isLiveChannel(i.channel))) {
     toast(`A call with ${p.name} on ${fmtDay(day)} is already logged`, "err");
     return false;
   }
-  return callsWrite(() => sb.from("interactions").insert({ person_id: id, happened_on: day, channel, summary, source: "dashboard" }),
-    `call with ${p.name} logged`);
+  callsSaving = true;
+  try {
+    const { data, error } = await sb.from("interactions")
+      .insert({ person_id: id, happened_on: day, channel, summary, source: "dashboard" })
+      .select("id,person_id,happened_on,channel,summary").single();
+    if (error) { toast(error.message, "err"); return false; }
+    p.interactions = [data, ...p.interactions].sort((a, b) => b.happened_on.localeCompare(a.happened_on));
+    return callsDone(p, `call with ${p.name} logged`);
+  } finally {
+    callsSaving = false;
+  }
+}
+async function callsDelete(personId, callId) {
+  const p = byId.get(personId);
+  const { error } = await sb.from("interactions").delete().eq("id", callId);
+  if (error) { toast(error.message, "err"); return false; }
+  p.interactions = p.interactions.filter(i => i.id !== callId);
+  return callsDone(p, "call deleted");
 }
 async function callsSetEvery(id, raw) {
   const p = byId.get(id);
   const days = raw.trim() === "" ? null : Number(raw);
   if (days != null && !(Number.isInteger(days) && days > 0)) { toast("Days must be a whole number above 0", "err"); return false; }
-  return callsWrite(() => sb.from("people").update({ call_every_days: days }).eq("id", id),
-    days ? `${p.name}: every ${days} days` : `${p.name}: no longer scheduled`);
+  const { error } = await sb.from("people").update({ call_every_days: days }).eq("id", id);
+  if (error) { toast(error.message, "err"); return false; }
+  p.callEvery = days;
+  return callsDone(p, days ? `${p.name}: every ${days} days` : `${p.name}: no longer scheduled`);
 }
 function callsPicked(field) {
   const id = callsLabels.get($(field).value.trim());

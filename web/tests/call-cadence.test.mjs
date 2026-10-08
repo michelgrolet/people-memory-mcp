@@ -78,3 +78,20 @@ test("a gap across a daylight-saving change is a whole number of days", () => {
   ])})`);
   assert.equal(rows[0].gap, 14);
 });
+
+// After a write the window recomputes the due date itself, with the rule the `person` view uses.
+vm.runInContext(slice("function callsRecompute("), ctx);
+test("a call logged today moves the next due date to today plus the cadence", () => {
+  const p = run(`(() => { const p = { callEvery: 14, createdOn: "2025-01-01", interactions: [
+    { happened_on: localIso(new Date()), channel: "call" }, { happened_on: "2026-01-05", channel: "email" }] };
+    callsRecompute(p); return p; })()`);
+  assert.equal(p.daysSinceCall, 0);
+  assert.equal(p.callDueOn, iso(14));
+});
+test("with no call left, the due date counts from the day the record was created", () => {
+  const p = run(`(() => { const p = { callEvery: 30, createdOn: "2026-02-01", interactions: [
+    { happened_on: "2026-03-01", channel: "whatsapp" }] }; callsRecompute(p); return p; })()`);
+  assert.equal(p.lastCall, null);
+  assert.equal(p.lastContact, "2026-03-01");
+  assert.equal(p.callDueOn, "2026-03-03");
+});
