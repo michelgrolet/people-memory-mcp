@@ -49,3 +49,32 @@ test("the hint under the field says when you last really talked", () => {
     "no call recorded · call in 10d");
   assert.equal(call("callHint", { callEvery: null, lastCall: iso(-3), daysSinceCall: 3 }), "last call 3d");
 });
+
+// The calls window counts a call the way the database does, and shows the days between calls.
+vm.runInContext([slice("function isLiveChannel("), slice("function callHistory(")].join("\n"), ctx);
+const run = src => JSON.parse(vm.runInContext(`JSON.stringify(${src})`, ctx));
+
+test("a call is what is_live_channel() counts as one", () => {
+  for (const ch of ["call", "visio", "irl", "video", "in person", "Phone", "coffee"])
+    assert.equal(run(`isLiveChannel(${JSON.stringify(ch)})`), true, ch);
+  for (const ch of ["whatsapp", "email", "sms", "linkedin", "call booked", null, ""])
+    assert.equal(run(`isLiveChannel(${JSON.stringify(ch)})`), false, String(ch));
+});
+
+test("call history keeps live channels, newest first, with the days since the call before", () => {
+  const rows = run(`callHistory(${JSON.stringify([
+    { id: 1, happened_on: "2026-01-05", channel: "call" },
+    { id: 2, happened_on: "2026-03-10", channel: "visio" },
+    { id: 3, happened_on: "2026-02-01", channel: "whatsapp" },
+    { id: 4, happened_on: "2026-03-29", channel: "irl" },
+  ])})`);
+  assert.deepEqual(rows.map(r => [r.id, r.gap]), [[4, 19], [2, 64], [1, null]]);
+});
+
+test("a gap across a daylight-saving change is a whole number of days", () => {
+  const rows = run(`callHistory(${JSON.stringify([
+    { id: 1, happened_on: "2026-03-20", channel: "call" },
+    { id: 2, happened_on: "2026-04-03", channel: "call" },
+  ])})`);
+  assert.equal(rows[0].gap, 14);
+});

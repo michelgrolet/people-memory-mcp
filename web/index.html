@@ -618,20 +618,20 @@
   }
 
   /* ── cleanup overlay ─────────────────────────────────── */
-  #cleanScrim{
+  #cleanScrim,#callsScrim{
     position:fixed;inset:0;z-index:96;background:rgba(6,7,9,.68);
     backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity 180ms var(--ease);
   }
-  #cleanScrim.open{opacity:1;pointer-events:auto}
-  #cleanModal{
+  #cleanScrim.open,#callsScrim.open{opacity:1;pointer-events:auto}
+  #cleanModal,#callsModal{
     position:fixed;z-index:97;top:5vh;left:50%;width:min(880px,calc(100% - 28px));max-height:min(86vh,860px);
     transform:translate(-50%,-10px) scale(.985);opacity:0;pointer-events:none;
     background:var(--surface);border:1px solid var(--line2);border-radius:var(--r-lg);
     box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;
     transition:opacity 180ms var(--ease),transform 220ms var(--ease);
   }
-  #cleanModal.open{opacity:1;transform:translate(-50%,0) scale(1);pointer-events:auto}
-  #cleanModal .md-modal-head h4{flex:0 0 auto}
+  #cleanModal.open,#callsModal.open{opacity:1;transform:translate(-50%,0) scale(1);pointer-events:auto}
+  #cleanModal .md-modal-head h4,#callsModal .md-modal-head h4{flex:0 0 auto}
   .cl-count{font:500 11.5px/1 var(--mono);color:var(--muted);flex:1}
   .cl-body{flex:1;overflow-y:auto;padding:14px 18px 22px}
   .cl-sec+.cl-sec{margin-top:22px}
@@ -707,19 +707,61 @@
   }
   .cl-foot .hint{color:var(--muted);font-size:11.5px}
   /* the top-bar button carries the open count, so a fresh problem is visible without opening it */
-  #cleanBtn{position:relative}
-  #cleanBtn .dot{
+  #cleanBtn,#callsBtn{position:relative}
+  #cleanBtn .dot,#callsBtn .dot{
     position:absolute;top:0;right:0;min-width:16px;height:16px;padding:0 3px;border-radius:999px;
     background:var(--accent);color:var(--bg);font:600 9.5px/16px var(--mono);text-align:center;
     border:2px solid var(--bg2);display:none;
   }
-  #cleanBtn.has .dot{display:block}
+  #cleanBtn.has .dot,#callsBtn.has .dot{display:block}
+  #callsBtn .dot{background:var(--red);color:#fff}
   @media (max-width:640px){
-    #cleanModal{top:0;left:0;transform:none;width:100%;height:100%;max-height:none;border-radius:0}
-    #cleanModal.open{transform:none}
+    #cleanModal,#callsModal{top:0;left:0;transform:none;width:100%;height:100%;max-height:none;border-radius:0}
+    #cleanModal.open,#callsModal.open{transform:none}
     .cl-cand{width:100%}
+    .ca-hist li{grid-template-columns:auto 1fr auto auto}
+    .ca-hist .ca-sum{grid-column:1 / -1;grid-row:2}
     .cl-cand b,.cl-cand .cl-meta{max-width:none;white-space:normal}
   }
+
+  /* ── calls window ────────────────────────────────────── */
+  .ca-form{
+    display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:9px 10px;
+    border:1px solid var(--line);border-radius:var(--r-md);background:var(--bg2);
+  }
+  .ca-form+.ca-form{margin-top:7px}
+  .ca-form .lbl{font:600 11px/1 var(--font);color:var(--muted);min-width:74px}
+  .ca-form input,.ca-form select{width:auto;flex:1 1 150px;padding:6px 8px;font-size:12.5px}
+  .ca-form input[type=date]{flex:0 0 auto}
+  .ca-form span{font-size:12px;color:var(--txt2)}
+  .ca-num{
+    width:58px;padding:5px 7px;font:500 12px/1 var(--mono);color:var(--txt);
+    background:var(--surface2);border:1px solid var(--line);border-radius:var(--r-sm);
+  }
+  .ca-form .ca-num{flex:0 0 auto;width:64px}
+  .ca-num:focus{outline:none;border-color:var(--accent)}
+  #callsList{margin-top:18px}
+  .ca-row{border:1px solid var(--line);border-radius:var(--r-md);background:var(--bg2);padding:9px 10px}
+  .ca-row+.ca-row{margin-top:7px}
+  .ca-top{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap}
+  .ca-name{font:600 13px/1.3 var(--font);color:var(--txt);background:none;border:none;padding:0;cursor:pointer;text-align:left}
+  .ca-name:hover{color:var(--accent)}
+  .ca-org{font-size:11.5px;color:var(--muted)}
+  .ca-due{font:600 11px/1 var(--mono);margin-left:auto;white-space:nowrap}
+  .ca-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-top:7px;font-size:11.5px;color:var(--txt2)}
+  .ca-meta b{color:var(--txt);font-weight:600}
+  .ca-meta label{display:inline-flex;align-items:center;gap:5px}
+  .ca-meta .cl-acts{margin:0 0 0 auto}
+  .ca-hist{margin-top:7px}
+  .ca-hist summary{cursor:pointer;font-size:11.5px;color:var(--muted)}
+  .ca-hist ol{list-style:none;margin:6px 0 0;padding:0}
+  .ca-hist li{
+    display:grid;grid-template-columns:96px 70px 1fr auto auto;align-items:center;gap:4px 10px;
+    padding:5px 0;border-top:1px solid var(--line);font-size:11.5px;color:var(--txt2);
+  }
+  .ca-gap{font-family:var(--mono);font-size:10.5px;color:var(--muted);white-space:nowrap}
+  .ca-del{border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;padding:2px 4px}
+  .ca-del:hover{color:var(--red)}
 
   /* ── merge window ────────────────────────────────────── */
   /* Sits above the cleanup screen rather than replacing it: the merge is answered and the list is
@@ -874,6 +916,10 @@
     </button>
     <button class="btn btn-ghost btn-icon" id="gedBtn" title="Import a family tree (GEDCOM)">
       <svg class="icon" viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+    </button>
+    <button class="btn btn-ghost btn-icon" id="callsBtn" title="Calls">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg>
+      <span class="dot" id="callsDot"></span>
     </button>
     <button class="btn btn-ghost btn-icon" id="cleanBtn" title="Cleanup — duplicates and broken links">
       <svg class="icon" viewBox="0 0 24 24"><path d="M12 3l7 3v5.5c0 4.2-2.9 7.9-7 9.5-4.1-1.6-7-5.3-7-9.5V6l7-3z"/><path d="m9 12 2 2 4-4"/></svg>
@@ -1031,6 +1077,34 @@
       <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
   </div>
   <div class="sk-body" id="skBody"></div>
+</div>
+
+<div id="callsScrim"></div>
+<div id="callsModal" role="dialog" aria-modal="true" aria-labelledby="callsModalTitle">
+  <div class="md-modal-head">
+    <h4 id="callsModalTitle">Calls</h4>
+    <span class="cl-count" id="callsCount"></span>
+    <button class="btn btn-ghost btn-icon" id="callsClose" title="Close (esc)">
+      <svg class="icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="cl-body">
+    <form class="ca-form" id="callAddForm" autocomplete="off">
+      <span class="lbl">Log a call</span>
+      <input id="caPerson" list="caPeople" placeholder="Who" required>
+      <input type="date" id="caDate" required>
+      <select id="caChannel"><option value="call">call</option><option value="visio">visio</option><option value="irl">in person</option></select>
+      <input id="caNote" placeholder="Note (optional)">
+      <button class="btn btn-sm" type="submit">Add</button>
+    </form>
+    <form class="ca-form" id="callEveryForm" autocomplete="off">
+      <span class="lbl">Schedule</span>
+      <input id="caEveryPerson" list="caPeople" placeholder="Who" required>
+      <span>every</span><input type="number" class="ca-num" id="caEveryDays" min="1" step="1" required><span>days</span>
+      <button class="btn btn-sm" type="submit">Schedule</button>
+    </form>
+    <datalist id="caPeople"></datalist>
+    <div id="callsList"></div>
+  </div>
 </div>
 
 <div id="cleanScrim"></div>
@@ -1448,7 +1522,7 @@ async function start(session) {
   buildGraph();
   setupCanvas();
   wire();
-  renderStats(); renderFilters(); renderActiveFilters(); cleanBadge();
+  renderStats(); renderFilters(); renderActiveFilters(); cleanBadge(); callsBadge();
   prewarm();
   requestAnimationFrame(tick);
   fitView(false);
@@ -1529,7 +1603,7 @@ async function load() {
 
 async function reload(keepId) {
   await load();
-  buildGraph(); renderStats(); renderFilters(); renderActiveFilters(); cleanBadge();
+  buildGraph(); renderStats(); renderFilters(); renderActiveFilters(); cleanBadge(); callsBadge();
   reheat(.28);
   if (keepId != null && byId.has(keepId)) select(keepId, false); else closeDrawer();
 }
@@ -2208,6 +2282,188 @@ function wireCleanModal() {
     cleanSkipped = new Set();
     renderClean(); cleanBadge();
     await cleanSaveSkipped();
+  };
+}
+
+// ── calls window ──────────────────────────────────────────
+// Everyone with a cadence, soonest due first, and the calls behind each one with the days between
+// them. A call is what the database's is_live_channel() counts as one, so the two must agree.
+function isLiveChannel(ch) {
+  return !!ch
+    && /(call|phone|meet|video|visio|facetime|in.?person|irl|drinks|coffee|lunch|dinner|breakfast|meeting|calendar)/i.test(ch)
+    && !/booked/i.test(ch);
+}
+// Live calls newest first, each with `gap`: the days since the call before it, null on the first.
+function callHistory(interactions) {
+  const day = iso => Date.parse(iso + "T00:00:00Z") / 86400000;
+  const calls = interactions
+    .filter(i => isLiveChannel(i.channel))
+    .sort((a, b) => b.happened_on.localeCompare(a.happened_on));
+  return calls.map((c, i) => {
+    const prev = calls[i + 1];
+    return { ...c, gap: prev ? day(c.happened_on) - day(prev.happened_on) : null };
+  });
+}
+function fmtDay(iso) {
+  const d = new Date(iso + "T00:00:00");
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: sameYear ? undefined : "numeric" });
+}
+
+let callsOpen = false;
+const callsOpenHist = new Set();
+let callsLabels = new Map();
+
+function callRows() {
+  return DATA.people
+    .filter(p => p.callEvery && p.kind !== "agent")
+    .map(p => ({ p, dueIn: callDueIn(p), history: callHistory(p.interactions) }))
+    .sort((a, b) => (a.dueIn ?? 1e9) - (b.dueIn ?? 1e9) || a.p.name.localeCompare(b.p.name));
+}
+function callsBadge() {
+  const btn = $("callsBtn");
+  if (!btn) return;
+  const due = callRows().filter(r => r.dueIn != null && r.dueIn <= 0).length;
+  btn.classList.toggle("has", due > 0);
+  $("callsDot").textContent = String(due);
+  btn.title = due ? `Calls: ${due} due` : "Calls";
+}
+
+// The person fields take a name from the list. Two people with one name are told apart by their
+// org, then by their id, so a pick always lands on exactly one record.
+function callsBuildLabels() {
+  const people = DATA.people.filter(p => p.kind !== "agent");
+  const count = new Map();
+  people.forEach(p => count.set(p.name, (count.get(p.name) || 0) + 1));
+  callsLabels = new Map();
+  for (const p of people) {
+    let label = p.name;
+    if (count.get(p.name) > 1) label = p.org ? `${p.name} · ${p.org}` : `${p.name} #${p.id}`;
+    if (callsLabels.has(label)) label = `${p.name} #${p.id}`;
+    callsLabels.set(label, p.id);
+  }
+  $("caPeople").innerHTML = [...callsLabels.keys()].sort().map(l => `<option value="${esc(l)}">`).join("");
+}
+const callsLabelOf = id => [...callsLabels].find(([, v]) => v === id)?.[0] || "";
+
+function callRowHtml({ p, history }) {
+  const gaps = history.map(h => h.gap).filter(g => g != null);
+  const avg = gaps.length ? Math.round(gaps.reduce((s, g) => s + g, 0) / gaps.length) : null;
+  const items = history.map(h => `<li>
+      <span>${fmtDay(h.happened_on)}</span><span>${esc(h.channel)}</span>
+      <span class="ca-sum">${esc(h.summary || "")}</span>
+      <span class="ca-gap">${h.gap == null ? "first logged" : `${h.gap} d after the previous`}</span>
+      <button class="ca-del" data-ca-del="${h.id}" title="Delete this call">×</button>
+    </li>`).join("");
+  return `<div class="ca-row">
+    <div class="ca-top">
+      <button class="ca-name" data-ca-open="${p.id}">${esc(p.name)}</button>
+      ${p.org ? `<span class="ca-org">${esc(p.org)}</span>` : ""}
+      <span class="ca-due" style="color:${callDueColor(p)}">${esc(callDueLabel(p))}</span>
+    </div>
+    <div class="ca-meta">
+      <label title="Empty it to stop scheduling">every
+        <input type="number" class="ca-num" min="1" step="1" value="${p.callEvery}" data-ca-every="${p.id}"> d</label>
+      <span>last <b>${p.lastCall ? fmtDay(p.lastCall) : "none logged"}</b></span>
+      <span>next <b>${p.callDueOn ? fmtDay(p.callDueOn) : ""}</b></span>
+      ${avg != null ? `<span>average gap <b>${avg} d</b></span>` : ""}
+      <span class="cl-acts">
+        <button class="cl-act" data-ca-today="${p.id}">called today</button>
+        <button class="cl-act" data-ca-log="${p.id}">other date</button>
+      </span>
+    </div>
+    ${history.length ? `<details class="ca-hist" data-ca-hist="${p.id}"${callsOpenHist.has(p.id) ? " open" : ""}>
+      <summary>${history.length} call${history.length > 1 ? "s" : ""} logged</summary><ol>${items}</ol></details>` : ""}
+  </div>`;
+}
+
+function renderCalls() {
+  const rows = callRows();
+  const due = rows.filter(r => r.dueIn != null && r.dueIn <= 0).length;
+  $("callsCount").textContent = `${rows.length} scheduled` + (due ? `, ${due} due` : "");
+  $("callsList").innerHTML = rows.length ? rows.map(callRowHtml).join("") : `<div class="cl-empty">
+    <div class="big">No call scheduled</div><div class="sub">Pick someone above and how often to call them.</div></div>`;
+
+  const list = $("callsList");
+  list.querySelectorAll("[data-ca-open]").forEach(el =>
+    el.onclick = () => { closeCallsModal(); select(Number(el.dataset.caOpen)); });
+  list.querySelectorAll("[data-ca-hist]").forEach(el =>
+    el.ontoggle = () => { const id = Number(el.dataset.caHist); el.open ? callsOpenHist.add(id) : callsOpenHist.delete(id); });
+  list.querySelectorAll("[data-ca-every]").forEach(el =>
+    el.onchange = () => callsSetEvery(Number(el.dataset.caEvery), el.value));
+  list.querySelectorAll("[data-ca-today]").forEach(el =>
+    el.onclick = () => callsLog(Number(el.dataset.caToday), localIso(new Date()), "call", null));
+  list.querySelectorAll("[data-ca-log]").forEach(el =>
+    el.onclick = () => {
+      $("caPerson").value = callsLabelOf(Number(el.dataset.caLog));
+      $("callsModal").querySelector(".cl-body").scrollTop = 0;
+      $("caDate").focus();
+    });
+  list.querySelectorAll("[data-ca-del]").forEach(el =>
+    el.onclick = () => callsWrite(() => sb.from("interactions").delete().eq("id", Number(el.dataset.caDel)), "call deleted"));
+}
+
+// Every write reloads the graph, so the due dates on screen are the database's, never a guess.
+async function callsWrite(op, done) {
+  const { error } = await op();
+  if (error) { toast(error.message, "err"); return false; }
+  await reload(selected);
+  if (callsOpen) renderCalls();
+  toast(done);
+  return true;
+}
+async function callsLog(id, day, channel, summary) {
+  const p = byId.get(id);
+  if (day > localIso(new Date())) { toast("A call cannot be logged in the future", "err"); return false; }
+  if (p.interactions.some(i => i.happened_on === day && isLiveChannel(i.channel))) {
+    toast(`A call with ${p.name} on ${fmtDay(day)} is already logged`, "err");
+    return false;
+  }
+  return callsWrite(() => sb.from("interactions").insert({ person_id: id, happened_on: day, channel, summary, source: "dashboard" }),
+    `call with ${p.name} logged`);
+}
+async function callsSetEvery(id, raw) {
+  const p = byId.get(id);
+  const days = raw.trim() === "" ? null : Number(raw);
+  if (days != null && !(Number.isInteger(days) && days > 0)) { toast("Days must be a whole number above 0", "err"); return false; }
+  return callsWrite(() => sb.from("people").update({ call_every_days: days }).eq("id", id),
+    days ? `${p.name}: every ${days} days` : `${p.name}: no longer scheduled`);
+}
+function callsPicked(field) {
+  const id = callsLabels.get($(field).value.trim());
+  if (id == null) toast("Pick a name from the list", "err");
+  return id;
+}
+
+function openCallsModal() {
+  $("callsScrim").classList.add("open"); $("callsModal").classList.add("open");
+  callsOpen = true;
+  callsBuildLabels();
+  const today = localIso(new Date());
+  $("caDate").value = today; $("caDate").max = today;
+  renderCalls();
+}
+function closeCallsModal() {
+  $("callsScrim").classList.remove("open"); $("callsModal").classList.remove("open");
+  callsOpen = false;
+}
+function wireCallsModal() {
+  $("callsBtn").onclick = () => { closePalette(); openCallsModal(); };
+  $("callsClose").onclick = closeCallsModal;
+  $("callsScrim").addEventListener("click", () => { if (callsOpen) closeCallsModal(); });
+  $("callAddForm").onsubmit = async e => {
+    e.preventDefault();
+    const id = callsPicked("caPerson");
+    if (id == null) return;
+    const ok = await callsLog(id, $("caDate").value, $("caChannel").value, $("caNote").value.trim() || null);
+    if (ok) { $("caPerson").value = ""; $("caNote").value = ""; }
+  };
+  $("callEveryForm").onsubmit = async e => {
+    e.preventDefault();
+    const id = callsPicked("caEveryPerson");
+    if (id == null) return;
+    const ok = await callsSetEvery(id, $("caEveryDays").value);
+    if (ok) { $("caEveryPerson").value = ""; $("caEveryDays").value = ""; }
   };
 }
 
@@ -4747,6 +5003,7 @@ function wire() {
   wireGedModal();
   wireSkModal();
   wireCleanModal();
+  wireCallsModal();
   wireMergeModal();
 
   $("searchTrigger").onclick = () => openPalette();
@@ -4845,6 +5102,7 @@ function wire() {
     }
     // Escape backs out of a pending merge first: closing the whole screen on the keystroke that was
     // meant to cancel one row is how somebody stops trusting the escape key.
+    if (callsOpen) { if (e.key === "Escape") { e.preventDefault(); closeCallsModal(); } return; }
     if (cleanOpen) {
       if (e.key === "Escape") {
         e.preventDefault();
