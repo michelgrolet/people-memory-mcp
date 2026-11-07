@@ -860,7 +860,53 @@
   #insightsList{max-height:min(56vh,420px);overflow-y:auto}
   #insightsList .grp .row-item .lbl .k{display:block;margin-top:1px}
 </style>
-</head>
+<!-- grolet-analytics:start --><script data-ga-id="G-JFMZ2BT6J5">/* Shared GA4 collection for grolet.fr. The tag only loads after explicit consent. */
+(() => {
+ 'use strict';
+ const script = document.currentScript;
+ const measurementId = script?.dataset.gaId || "G-JFMZ2BT6J5";
+ if (!/^G-[A-Z0-9]+$/.test(measurementId || '')) return;
+ const key = 'grolet_analytics_consent';
+ const remembered = document.cookie.split('; ').find(c => c.startsWith(key + '='))?.split('=')[1];
+ let started = false;
+ const record = value => {
+  const domain = location.hostname === 'grolet.fr' || location.hostname.endsWith('.grolet.fr') ? '; Domain=.grolet.fr' : '';
+  document.cookie = `${key}=${value}; Max-Age=15552000; Path=/${domain}; SameSite=Lax; Secure`;
+ };
+ function start() {
+  if (started) { window['ga-disable-'+measurementId]=false; window.gtag('consent','update',{analytics_storage:'granted'}); return; }
+  started = true;
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = window.gtag || function () { window.dataLayer.push(arguments); };
+  window.gtag('consent', 'default', {analytics_storage:'denied',ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied'});
+  window.gtag('consent', 'update', {analytics_storage:'granted'});
+  const safePage={page_location:location.origin+'/',page_title:location.hostname,page_referrer:document.referrer ? new URL(document.referrer).origin+'/' : ''};
+  window.gtag('set', safePage);
+  window.gtag('set','send_page_view',false);
+  window.gtag('js', new Date());
+  // Aggregate traffic by hostname. User content, private routes and query values stay out.
+  window.gtag('config', measurementId, {page_location:location.origin+'/',page_title:location.hostname,page_referrer:document.referrer ? new URL(document.referrer).origin+'/' : '',allow_google_signals:false,allow_ad_personalization_signals:false,cookie_domain:'grolet.fr',cookie_flags:'SameSite=Lax;Secure',send_page_view:false});
+  window.gtag('event','page_view',{...safePage,send_to:measurementId});
+  const tag=document.createElement('script');tag.async=true;tag.src='https://www.googletagmanager.com/gtag/js?id='+measurementId;document.head.appendChild(tag);
+ }
+ function preferences() {
+  document.querySelector('#grolet-consent')?.remove();
+  const box=document.createElement('section');box.id='grolet-consent';box.setAttribute('aria-label','Mesure d’audience');
+  box.style.cssText='position:fixed;bottom:16px;left:16px;right:16px;max-width:620px;z-index:2147483647;padding:18px;border:1px solid #ccd4dd;border-radius:8px;background:white;color:#142737;font:13px/1.5 Arial,sans-serif;box-shadow:0 6px 30px #14273720';
+  const p=document.createElement('p');p.textContent='Autoriser Google Analytics à mesurer les visites sur les sites grolet.fr ? Seuls le site visité et des statistiques d’audience sont envoyés. Votre choix vaut pour ces sites et peut être modifié.';p.style.margin='0 0 12px';box.appendChild(p);
+  for (const [text,value] of [['Accepter','granted'],['Refuser','denied']]) {
+   const b=document.createElement('button');b.type='button';b.textContent=text;b.style.cssText='padding:9px 15px;margin-right:10px;border:1px solid #78889a;border-radius:4px;background:#fff;color:#142737;font:inherit;cursor:pointer';
+   b.addEventListener('click',()=>{record(value);box.remove();if(value==='granted')start();else if(started){window['ga-disable-'+measurementId]=true;window.gtag('consent','update',{analytics_storage:'denied'});}});box.appendChild(b);
+  }
+  document.body.appendChild(box);
+ }
+ function init() {
+  if(remembered==='granted')start();else if(remembered!=='denied')preferences();
+  const b=document.createElement('button');b.type='button';b.textContent='Préférences de mesure d’audience';b.style.cssText='display:block;margin:14px auto;padding:6px;border:0;background:none;color:inherit;font:11px Arial,sans-serif;text-decoration:underline;cursor:pointer';b.addEventListener('click',preferences);(document.querySelector('footer')||document.body).appendChild(b);
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+})();
+</script><!-- grolet-analytics:end --></head>
 <body>
 
 <div id="boot"><div class="pulse"><span class="dot"></span> loading your people graph…</div></div>
