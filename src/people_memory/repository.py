@@ -97,6 +97,54 @@ def _normalize_identifier(value: str) -> str:
     return value.strip().lower()
 
 
+# What LinkedIn members put after their name and is not part of it: credentials, pronouns, a job
+# tagline. Split on the first of these and keep the head.
+DISPLAY_NAME_TAIL = re.compile(r"[,|/\\;·•‧]|\s[-–—]\s")
+
+
+def _display_name_key(value: str) -> str:
+    """The key two spellings of one person's *display* name share.
+
+    LinkedIn returns whatever each member typed into their own profile, and they retype it: a
+    charter appears after a comma, a stray full stop lands inside the surname, an emoji gains a
+    space, an accent is dropped, a surname is cut to its initial. None of that is a different
+    person — but none of it is decidable from the name alone either, which is why this key is only
+    ever consulted **after** a profile URL has already identified exactly one stored record. It
+    sanity-checks that identification; it never makes one.
+    """
+    head = DISPLAY_NAME_TAIL.split(value, 1)[0]
+    return _normalize_name(head)
+
+
+def _is_display_name_variant(stored: str, incoming: str) -> bool:
+    """Whether two display names are the same name written differently.
+
+    Deliberately narrow, and for the same reason `_normalize_org_name` is: this decides identity,
+    and resemblance is not identity. No similarity threshold appears here. A threshold loose enough
+    to accept "Tylan B" / "Tylan Braquehais" is loose enough to accept two cousins, and the caller
+    is about to write one person's employer onto the other's record.
+
+    Two shapes count, both of them reversible by eye:
+
+    1. the keys match once credentials, punctuation, accents and case are dropped;
+    2. every token matches but one name's final token is an abbreviation of the other's —
+       "Tylan B" against "Tylan Braquehais". Only the final token may be shortened, and it must be
+       a genuine prefix.
+    """
+    left, right = _display_name_key(stored), _display_name_key(incoming)
+    if not left or not right:
+        return False
+    if left == right:
+        return True
+    left_tokens, right_tokens = left.split(), right.split()
+    if len(left_tokens) != len(right_tokens) or len(left_tokens) < 2:
+        return False
+    if left_tokens[:-1] != right_tokens[:-1]:
+        return False
+    short, long = sorted((left_tokens[-1], right_tokens[-1]), key=len)
+    return short != long and long.startswith(short)
+
+
 def _name_similarity(left: str, right: str) -> float:
     left_normalized = _normalize_name(left)
     right_normalized = _normalize_name(right)
@@ -251,6 +299,24 @@ class GraphRepository:
                 (full_name.strip(),),
             ).fetchall()
         )
+
+    @staticmethod
+    def _identified_by_linkedin_url(conn, linkedin_url: str, person_id: int) -> bool:
+        """Whether this profile URL belongs to that record, and to no other.
+
+        Asked separately from `_person_candidates` because that method stops at its first hit: an
+        incoming email that matches somebody makes it return before it ever looks at the URL. The
+        question here is narrower and has to be asked on its own — does the URL point at exactly
+        one record, and is it this one?
+        """
+        value = (linkedin_url or "").strip().lower()
+        if not value:
+            return False
+        rows = conn.execute(
+            "select person_id from identifiers where kind = 'linkedin' and lower(value) = %s",
+            (value,),
+        ).fetchall()
+        return len(rows) == 1 and rows[0]["person_id"] == person_id
 
     def resolve_person(self, name: str) -> dict[str, Any]:
         candidates = self.db.fetch_all(
@@ -436,20 +502,38 @@ class GraphRepository:
                     "candidates": candidates,
                 }
             if candidates and candidates[0]["full_name"].casefold() != full_name.casefold():
-                return {
-                    "status": "needs_confirmation",
-                    "reason": (
-                        "An email or phone belongs to a person with a different name. "
-                        "Ask whether they are the same person before changing anything."
-                    ),
-                    "incoming": {
-                        "full_name": full_name,
-                        "email": email,
-                        "phone": phone,
-                        "linkedin_url": linkedin_url,
-                    },
-                    "candidates": candidates,
-                }
+                # A LinkedIn profile URL is account-level and unique, so when it lands on exactly
+                # one record and the two display names are the same name written differently, the
+                # question has no one to ask: it is that person, retyping their own headline. This
+                # is the most repeated question the sync asks and the least answerable — nobody can
+                # confirm that "Franck Sega, CAIA" is Franck Sega more reliably than the URL does.
+                #
+                # Both halves are required. The URL alone is not enough: a profile URL can be
+                # attached to the wrong record, and on the installation this was measured on
+                # exactly one of 635 was — a record named after one person carrying another's URL.
+                # That record is reported by this very branch, and it is the only thing reporting
+                # it. A fix that silenced it on the strength of the URL alone would have removed
+                # the only witness, then written the wrong person's employer on top.
+                settled_by_profile_url = bool(
+                    linkedin_url
+                    and self._identified_by_linkedin_url(conn, linkedin_url, candidates[0]["id"])
+                    and _is_display_name_variant(candidates[0]["full_name"], full_name)
+                )
+                if not settled_by_profile_url:
+                    return {
+                        "status": "needs_confirmation",
+                        "reason": (
+                            "An email or phone belongs to a person with a different name. "
+                            "Ask whether they are the same person before changing anything."
+                        ),
+                        "incoming": {
+                            "full_name": full_name,
+                            "email": email,
+                            "phone": phone,
+                            "linkedin_url": linkedin_url,
+                        },
+                        "candidates": candidates,
+                    }
             if not candidates and not confirmed_new:
                 people = conn.execute(
                     "select id, full_name, current_org, city from people"
